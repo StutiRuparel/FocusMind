@@ -39,17 +39,31 @@ const Dashboard: React.FC<DashboardProps> = ({
               className="decrease-button"
               onClick={onDecreaseAttention}
               disabled={loading}
+              title="Attention will decrease and automatically trigger a voice nudge"
             >
-              {loading ? 'Loading...' : 'Decrease Attention (-15)'}
+              {loading ? 'Loading...' : 'Decrease Attention (-15) 🎤'}
             </button>
             
             <div className="nudge-buttons">
+              <div className="auto-nudge-info" style={{
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #0ea5e9',
+                borderRadius: '8px',
+                fontSize: '0.9rem',
+                color: '#0369a1'
+              }}>
+                🎤 <strong>Auto Voice Nudge:</strong> Every time your attention drops, David Goggins will automatically motivate you with a new message and read it aloud!
+              </div>
+              
               <button 
                 className={`voice-nudge-button ${nudgeExecuted ? 'nudge-executed' : ''}`}
                 onClick={onGetVoiceNudge}
                 disabled={loading}
+                title="Get a new voice nudge (happens automatically when attention drops)"
               >
-                {loading ? 'Loading...' : 'Voice Nudge 🎤'}
+                {loading ? 'Loading...' : 'Get New Voice Nudge 🎤'}
               </button>
               
               <button 

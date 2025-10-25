@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 import Dashboard from './components/Dashboard';
@@ -22,6 +22,16 @@ interface NudgeResponse {
   source: string;
   nudge_type?: string;
   platform?: string;
+  attention_score?: number;  // Add attention score to the response
+}
+
+interface FocusChartResponse {
+  success: boolean;
+  chart_base64?: string;
+  session_stats?: any;
+  png_filename?: string;
+  data_points?: number;
+  error?: string;
 }
 
 function App() {
@@ -30,6 +40,75 @@ function App() {
   const [nudgeExecuted, setNudgeExecuted] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Pomodoro Timer State
+  const [pomodoroTime, setPomodoroTime] = useState(25 * 60); // 25 minutes (1500 seconds) - CHANGE THIS VALUE TO ADJUST TIMER
+  const [pomodoroRunning, setPomodoroRunning] = useState(false);
+  const [pomodoroSessions, setPomodoroSessions] = useState(0);
+  const [isBreakTime, setIsBreakTime] = useState(false); // Track if we're in break mode
+  const sessionIncrementedRef = useRef(false); // Use ref to prevent double increment
+  const initialMotivationFetchedRef = useRef(false); // Use ref to prevent multiple initial fetches
+  
+  // Focus chart state
+  const [showFocusChart, setShowFocusChart] = useState(false);
+  const [focusChartData, setFocusChartData] = useState<FocusChartResponse | null>(null);
+  
+  // Global audio management to prevent multiple audio tracks playing simultaneously
+  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+
+  // Helper function to stop any existing audio and play new audio
+  const playAudio = async (audioUrl: string, audioType: string = 'voice') => {
+    // Stop any currently playing audio
+    if (currentAudio) {
+      console.log('🔇 Stopping existing audio before playing new audio');
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      setCurrentAudio(null);
+    }
+
+    console.log(`🎵 Creating new audio element for ${audioType} with URL:`, audioUrl);
+    const audio = new Audio(audioUrl);
+    audio.volume = 0.8;
+    setCurrentAudio(audio);
+
+    // Add event listeners
+    audio.onloadstart = () => console.log(`🎵 Loading ${audioType} audio...`);
+    audio.oncanplay = () => console.log(`🎵 ${audioType} audio ready to play`);
+    audio.onplay = () => console.log(`🎵 ${audioType} audio started playing`);
+    audio.onended = () => {
+      console.log(`🎵 ${audioType} audio finished playing`);
+      setCurrentAudio(null);
+      if (audioType === 'break') {
+        setIsBreakTime(false);
+        console.log('🛌 Exiting break time mode');
+      }
+      setTimeout(() => setNudgeExecuted(false), 3000);
+    };
+    audio.onerror = (e) => {
+      console.error(`🚫 ${audioType} audio playback error:`, e);
+      console.error(`🚫 Failed audio URL:`, audioUrl);
+      setCurrentAudio(null);
+      if (audioType === 'break') {
+        setIsBreakTime(false);
+      }
+    };
+
+    try {
+      console.log(`🎵 Attempting to play ${audioType} audio...`);
+      await audio.play();
+      console.log(`✅ ${audioType} audio playing successfully!`);
+      return true;
+    } catch (playError) {
+      console.error(`❌ ${audioType} audio play failed:`, playError);
+      console.error(`❌ Failed audio URL:`, audioUrl);
+      setCurrentAudio(null);
+      if (audioType === 'break') {
+        setIsBreakTime(false);
+      }
+      setTimeout(() => setNudgeExecuted(false), 5000);
+      return false;
+    }
+  };
 
   // Request notification permission on app load
   useEffect(() => {
@@ -138,8 +217,17 @@ function App() {
       const url = reset 
         ? 'http://localhost:8000/motivation?reset=true'
         : 'http://localhost:8000/motivation';
+      
+      console.log(`📡 Fetching motivation from: ${url} (reset: ${reset})`);
       const response = await axios.get<MotivationData>(url);
       setMotivationData(response.data);
+      
+      if (reset) {
+        console.log('🎯 Initial motivation loaded (reset=true):', response.data.message);
+        console.log('📊 Initial attention score:', response.data.attention_score);
+      } else {
+        console.log('📋 Updated motivation loaded:', response.data.message);
+      }
     } catch (error) {
       console.error('Error fetching motivation:', error);
     } finally {
@@ -153,6 +241,8 @@ function App() {
       const response = await axios.post<AttentionResponse>('http://localhost:8000/decrease-attention');
       const newScore = response.data.attention_score;
       
+      console.log(`🔢 Attention score changed: ${motivationData?.attention_score} → ${newScore}`);
+      
       // Update the attention score in our state
       if (motivationData) {
         setMotivationData({
@@ -160,13 +250,15 @@ function App() {
           attention_score: newScore
         });
         
-        // If attention score drops below 80, automatically get new motivation
-        if (newScore < 80 && motivationData.attention_score >= 80) {
-          console.log('🚨 Attention dropped below 80! Getting new motivation...');
-          // Fetch new motivation after a short delay to show the score change first
+        // ONLY trigger automatic voice nudge if we're NOT in break time
+        if (!isBreakTime) {
+          console.log('🚨 Attention score dropped! Automatically getting new motivational voice nudge...');
+          // Trigger voice nudge after a short delay to show the score change first
           setTimeout(() => {
-            fetchMotivation(false);
-          }, 1000);
+            getVoiceNudge();
+          }, 500);
+        } else {
+          console.log('🛌 In break time - skipping automatic voice nudge');
         }
       }
     } catch (error) {
@@ -188,13 +280,19 @@ function App() {
         // Set visual indicator that nudge script executed
         setNudgeExecuted(true);
         
-        // Update the message with the new nudge quote
-        setMotivationData({
-          ...motivationData,
-          message: response.data.message
-        });
+        // ONLY update message if we're NOT in break time to prevent flickering
+        if (!isBreakTime) {
+          // Update both message and attention score from the response
+          setMotivationData({
+            ...motivationData,
+            message: response.data.message,
+            attention_score: response.data.attention_score ?? motivationData.attention_score  // Use response score if available, fallback to current
+          });
+          console.log('💪 Updated message with new David Goggins voice quote!');
+        } else {
+          console.log('🛌 In break mode - voice nudge triggered but not updating message to prevent flickering');
+        }
         
-        console.log('💪 Got new David Goggins voice quote!');
         console.log('🎯 Voice nudge executed successfully!');
         
         // Play audio if available
@@ -202,25 +300,9 @@ function App() {
           const audioUrl = `http://localhost:8000${response.data.audio_url}`;
           console.log('🔊 Playing voiceover:', audioUrl);
           
-          const audio = new Audio(audioUrl);
-          audio.volume = 0.8; // Set volume to 80%
+          const success = await playAudio(audioUrl, 'voice');
           
-          // Add event listeners for better user experience
-          audio.onloadstart = () => console.log('🎵 Loading audio...');
-          audio.oncanplay = () => console.log('🎵 Audio ready to play');
-          audio.onplay = () => console.log('🎵 Audio started playing');
-          audio.onended = () => {
-            console.log('🎵 Audio finished playing');
-            // Keep the visual indicator for 3 more seconds after audio ends
-            setTimeout(() => setNudgeExecuted(false), 3000);
-          };
-          audio.onerror = (e) => console.error('🚫 Audio playback error:', e);
-          
-          // Play the audio
-          try {
-            await audio.play();
-          } catch (playError) {
-            console.error('Audio play failed (user interaction may be required):', playError);
+          if (!success) {
             // Keep indicator visible even if audio fails
             setTimeout(() => setNudgeExecuted(false), 5000);
           }
@@ -231,6 +313,49 @@ function App() {
       }
     } catch (error) {
       console.error('Error getting voice nudge:', error);
+      setNudgeExecuted(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const readCurrentMessage = async () => {
+    if (!motivationData?.message) {
+      console.log('❌ No message to read');
+      return;
+    }
+
+    setLoading(true);
+    setNudgeExecuted(false);
+    
+    try {
+      console.log('🎤 Reading current message aloud:', motivationData.message);
+      
+      // Call backend to generate audio for the current message
+      const response = await axios.post<{
+        success: boolean;
+        message: string;
+        audio_url?: string;
+        audio_file?: string;
+        source: string;
+      }>('http://localhost:8000/generate-voice-audio', {
+        message: motivationData.message
+      });
+      
+      if (response.data.success && response.data.audio_url) {
+        setNudgeExecuted(true);
+        
+        const audioUrl = `http://localhost:8000${response.data.audio_url}`;
+        console.log('🔊 Playing current message audio:', audioUrl);
+        
+        const success = await playAudio(audioUrl, 'voice');
+        
+        if (!success) {
+          setTimeout(() => setNudgeExecuted(false), 5000);
+        }
+      }
+    } catch (error) {
+      console.error('Error reading current message:', error);
       setNudgeExecuted(false);
     } finally {
       setLoading(false);
@@ -292,24 +417,225 @@ function App() {
     }
   };
 
-  // Keep the old function name for backward compatibility
-  const getNudgeQuote = getVoiceNudge;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const getBreakNudge = async () => {
+    setLoading(true);
+    setNudgeExecuted(false); // Reset indicator
+    
+    try {
+      console.log('🍅 Pomodoro break time! Getting break nudge...');
+      
+      // Set break time mode to prevent other nudges from interfering
+      setIsBreakTime(true);
+      
+      const response = await axios.post<NudgeResponse>('http://localhost:8000/get-break-nudge');
+      
+      console.log('🔍 Break nudge response:', response.data); // Debug log
+      
+      if (response.data.success) {
+        // Set visual indicator that nudge script executed
+        setNudgeExecuted(true);
+        
+        // ALWAYS update the message with the break nudge (this should show the break message)
+        if (motivationData) {
+          setMotivationData({
+            ...motivationData,
+            message: response.data.message
+          });
+        }
+        
+        console.log('🛌 Got David Goggins break advice:', response.data.message);
+        console.log('🎯 Break nudge executed successfully!');
+        
+        // FORCE audio playback for break nudges
+        if (response.data.audio_url) {
+          const audioUrl = `http://localhost:8000${response.data.audio_url}`;
+          console.log('🔊 FORCING break voiceover playback:', audioUrl);
+          
+          // Stop any existing audio first
+          if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.currentTime = 0;
+            setCurrentAudio(null);
+          }
+          
+          // Create and play break audio with higher priority
+          const breakAudio = new Audio(audioUrl);
+          breakAudio.volume = 0.9; // Slightly higher volume for break nudges
+          setCurrentAudio(breakAudio);
+          
+          breakAudio.onloadstart = () => console.log('🎵 Loading BREAK audio...');
+          breakAudio.oncanplay = () => console.log('🎵 BREAK audio ready to play');
+          breakAudio.onplay = () => console.log('🎵 ✅ BREAK AUDIO STARTED PLAYING!');
+          breakAudio.onended = () => {
+            console.log('🎵 ✅ BREAK AUDIO FINISHED PLAYING');
+            setCurrentAudio(null);
+            setIsBreakTime(false);
+            console.log('🛌 Exiting break time mode');
+            setTimeout(() => setNudgeExecuted(false), 3000);
+            
+            // Show focus chart after break audio finishes
+            setTimeout(() => {
+              getFocusChart();
+            }, 1000);
+          };
+          breakAudio.onerror = (e) => {
+            console.error('🚫 BREAK audio playback error:', e);
+            console.error('🚫 Failed break audio URL:', audioUrl);
+            setCurrentAudio(null);
+            setIsBreakTime(false);
+          };
+          
+          try {
+            await breakAudio.play();
+            console.log('✅ BREAK AUDIO PLAYING SUCCESSFULLY!');
+          } catch (playError) {
+            console.error('❌ BREAK audio play failed:', playError);
+            console.error('❌ Failed break audio URL:', audioUrl);
+            setIsBreakTime(false);
+            setTimeout(() => setNudgeExecuted(false), 5000);
+            
+            // Show focus chart even if audio fails
+            setTimeout(() => {
+              getFocusChart();
+            }, 1000);
+          }
+        } else {
+          console.warn('⚠️ No audio URL provided in break nudge response');
+          setIsBreakTime(false);
+          setTimeout(() => setNudgeExecuted(false), 3000);
+          
+          // Show focus chart even without audio
+          setTimeout(() => {
+            getFocusChart();
+          }, 1000);
+        }
+      } else {
+        console.error('❌ Break nudge request failed:', response.data);
+        setIsBreakTime(false);
+      }
+    } catch (error) {
+      console.error('❌ Error getting break nudge:', error);
+      setNudgeExecuted(false);
+      setIsBreakTime(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFocusChart = async () => {
+    try {
+      console.log('📊 Fetching focus chart for completed session...');
+      
+      const response = await axios.post<FocusChartResponse>('http://localhost:8000/get-focus-chart');
+      
+      if (response.data.success) {
+        console.log('📈 Focus chart generated successfully!');
+        console.log('📊 Session stats:', response.data.session_stats);
+        
+        setFocusChartData(response.data);
+        setShowFocusChart(true);
+      } else {
+        console.warn('⚠️ Focus chart generation failed:', response.data.error);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching focus chart:', error);
+    }
+  };
+
+  const closeFocusChart = () => {
+    setShowFocusChart(false);
+    setFocusChartData(null);
+  };
+
+  // Pomodoro Timer Functions
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const startPomodoro = () => setPomodoroRunning(true);
+  const pausePomodoro = () => setPomodoroRunning(false);
+  const resetPomodoro = () => {
+    setPomodoroRunning(false);
+    setPomodoroTime(25 * 60); // Reset to 25 minutes (1500 seconds) - CHANGE THIS TO MATCH INITIAL VALUE
+    setIsBreakTime(false); // Exit break mode when resetting
+    sessionIncrementedRef.current = false; // Reset session increment flag
+  };
+
+  // Pomodoro Timer Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (pomodoroRunning && pomodoroTime > 0) {
+      interval = setInterval(() => {
+        setPomodoroTime(prev => {
+          if (prev <= 1) {
+            setPomodoroRunning(false);
+            
+            // Only increment session once using ref
+            if (!sessionIncrementedRef.current) {
+              sessionIncrementedRef.current = true;
+              
+              setPomodoroSessions(currentSessions => {
+                const newSessionCount = currentSessions + 1;
+                console.log(`🍅 Pomodoro session #${newSessionCount} complete! Triggering break nudge...`);
+                
+                // Trigger break nudge when Pomodoro completes
+                setTimeout(() => {
+                  getBreakNudge();
+                }, 100);
+                
+                return newSessionCount;
+              });
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    // Reset the increment flag when starting a new timer
+    if (pomodoroRunning && pomodoroTime === 25 * 60) {
+      sessionIncrementedRef.current = false;
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [pomodoroRunning, pomodoroTime]);
 
   useEffect(() => {
-    // Reset attention score to 100 on page load/refresh
-    fetchMotivation(true);
+    // Reset attention score to 100 on page load/refresh - but only once
+    if (!initialMotivationFetchedRef.current) {
+      initialMotivationFetchedRef.current = true;
+      console.log('🎯 Initial app load - fetching motivation once');
+      fetchMotivation(true);
+    }
   }, []);
+
+  // Cleanup function to stop audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+    };
+  }, [currentAudio]);
 
   return (
     <div className="App">
       <Header 
-        message={motivationData?.message || "Loading motivation..."} 
+        message={motivationData?.message || "Welcome to FocusMind! Click 'Get Voice Nudge' to hear David Goggins motivation."} 
         loading={loading}
       />
       <Dashboard 
         attentionScore={motivationData?.attention_score || 0}
         onDecreaseAttention={decreaseAttention}
-        onGetVoiceNudge={getVoiceNudge}
+        onGetVoiceNudge={readCurrentMessage}
         onGetNotificationNudge={getNotificationNudge}
         loading={loading}
         nudgeExecuted={nudgeExecuted}
@@ -323,6 +649,233 @@ function App() {
           }
         }}
       />
+      
+      {/* FUNCTIONAL Pomodoro Timer */}
+      <div style={{ 
+        margin: '2rem auto', 
+        padding: '2rem', 
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        borderRadius: '16px',
+        maxWidth: '400px',
+        textAlign: 'center',
+        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2 style={{ margin: '0 0 1rem 0', color: '#1f2937' }}>
+          🍅 Pomodoro Timer
+        </h2>
+        
+        <div style={{ 
+          fontSize: '0.9rem', 
+          color: '#6b7280',
+          marginBottom: '1rem'
+        }}>
+          Session #{pomodoroSessions + 1} • 
+          {pomodoroRunning ? ' ⏰ Running' : ' ⏸️ Paused'}
+        </div>
+        
+        <div style={{
+          fontSize: '3rem',
+          fontWeight: 'bold',
+          color: pomodoroTime <= 60 ? '#ef4444' : '#1f2937',
+          margin: '2rem 0',
+          fontFamily: 'monospace'
+        }}>
+          {formatTime(pomodoroTime)}
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {!pomodoroRunning ? (
+            <button 
+              onClick={startPomodoro}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              ▶️ Start
+            </button>
+          ) : (
+            <button 
+              onClick={pausePomodoro}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              ⏸️ Pause
+            </button>
+          )}
+          
+          <button 
+            onClick={resetPomodoro}
+            style={{
+              padding: '0.75rem 1.5rem',
+              background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            🔄 Reset
+          </button>
+        </div>
+
+        <div style={{ 
+          marginTop: '1.5rem', 
+          fontSize: '0.85rem', 
+          color: '#6b7280',
+          padding: '1rem',
+          background: '#f3f4f6',
+          borderRadius: '8px'
+        }}>
+          📋 <strong>How it works:</strong><br/>
+          • Click Start for 25-minute focus session<br/>
+          • Timer turns red in final minute<br/>
+          • Auto break nudge when timer reaches 0<br/>
+          • David Goggins tells you to stretch & hydrate!<br/>
+          • After break → See your focus performance chart!<br/>
+          • {isBreakTime ? '🛌 BREAK MODE: No other nudges will interrupt' : '💪 FOCUS MODE: Ready for motivation'}
+        </div>
+        
+        {pomodoroTime === 0 && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            background: '#f0fdf4',
+            color: '#16a34a',
+            borderRadius: '8px',
+            fontWeight: '600',
+            animation: 'pulse 2s infinite'
+          }}>
+            🎉 Session Complete! Time for a break!
+          </div>
+        )}
+      </div>
+      
+      {/* Focus Chart Modal */}
+      {showFocusChart && focusChartData && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            overflow: 'auto',
+            position: 'relative'
+          }}>
+            <button
+              onClick={closeFocusChart}
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '2rem',
+                height: '2rem',
+                cursor: 'pointer',
+                fontSize: '1.2rem'
+              }}
+            >
+              ×
+            </button>
+            
+            <h2 style={{ textAlign: 'center', marginBottom: '1.5rem', color: '#1f2937' }}>
+              📊 Focus Session Analysis
+            </h2>
+            
+            {focusChartData.chart_base64 && (
+              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                <img 
+                  src={`data:image/png;base64,${focusChartData.chart_base64}`}
+                  alt="Focus Score Chart"
+                  style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px' }}
+                />
+              </div>
+            )}
+            
+            {focusChartData.session_stats && (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: '1rem',
+                marginBottom: '1.5rem'
+              }}>
+                <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Average Focus</h4>
+                  <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: '#059669' }}>
+                    {focusChartData.session_stats.average_focus ? Math.round(focusChartData.session_stats.average_focus) : 0}%
+                  </p>
+                </div>
+                
+                <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Peak Focus</h4>
+                  <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' }}>
+                    {focusChartData.session_stats.max_focus ? Math.round(focusChartData.session_stats.max_focus) : 0}%
+                  </p>
+                </div>
+                
+                <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Session Duration</h4>
+                  <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: '#7c3aed' }}>
+                    {focusChartData.session_stats.duration_seconds ? Math.round(focusChartData.session_stats.duration_seconds / 60) : 0} min
+                  </p>
+                </div>
+                
+                <div style={{ background: '#f3f4f6', padding: '1rem', borderRadius: '8px' }}>
+                  <h4 style={{ margin: '0 0 0.5rem 0', color: '#374151' }}>Data Points</h4>
+                  <p style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold', color: '#dc2626' }}>
+                    {focusChartData.data_points || 0}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            <div style={{ textAlign: 'center' }}>
+              <button
+                onClick={closeFocusChart}
+                style={{
+                  padding: '0.75rem 2rem',
+                  background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Continue Studying 💪
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

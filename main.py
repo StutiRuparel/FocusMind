@@ -2,6 +2,7 @@ import os
 import subprocess
 import json
 from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +12,14 @@ from openai import OpenAI
 from pydantic import BaseModel
 import random
 
+# Import the focus scoring system
+from FocusScore import generate_focus_chart_base64, generate_session_stats
+
 # Global attention score variable (shared state)
 attention_score = 100
+
+# Global focus score tracking for the current session
+focus_score_history = []
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,7 +36,7 @@ app.mount("/audio", StaticFiles(directory="audio_files"), name="audio")
 # Add CORS middleware to allow React frontend to connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:3004", "http://localhost:3005", "http://localhost:3006", "http://localhost:3007", "http://localhost:3008"],  # React dev server on multiple ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,20 +60,30 @@ async def root():
 @app.get("/motivation", response_model=MotivationResponse)
 async def get_motivation(reset: bool = False):
     """Get a motivational quote from David Goggins style coach"""
-    global attention_score
+    global attention_score, focus_score_history
     
     # Reset attention score to 100 if requested (page refresh)
     if reset:
         attention_score = 100
+        # Also reset focus history when starting a new session
+        focus_score_history = []
+    
+    # Add initial score to history if it's the first entry
+    if not focus_score_history:
+        current_time = datetime.now().strftime("%H:%M:%S")
+        focus_score_history.append({
+            "timestamp": current_time,
+            "focus_score": attention_score
+        })
     
     try:
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "You are a David Goggins motivational study coach. Give intense, motivational study advice in his style. Keep it under 100 words."},
+                {"role": "system", "content": "You are a study coach loosely inspired by David Goggins. Give intense, motivational study advice in a strictly PG version of his style. (No swearing). Keep it under 30 words."},
                 {"role": "user", "content": "Give me motivation to study hard"}
             ],
-            max_completion_tokens=150
+            max_tokens=150
         )
         
         message = response.choices[0].message.content
@@ -85,9 +102,68 @@ async def get_attention_score():
 @app.post("/decrease-attention")
 async def decrease_attention():
     """Decrease attention score by 15"""
-    global attention_score
+    global attention_score, focus_score_history
     attention_score = max(0, attention_score - 15)  # Don't go below 0
+    
+    # Add to focus score history with timestamp
+    current_time = datetime.now().strftime("%H:%M:%S")
+    focus_score_history.append({
+        "timestamp": current_time,
+        "focus_score": attention_score
+    })
+    
     return {"attention_score": attention_score, "message": f"Attention score decreased to {attention_score}"}
+
+@app.post("/get-focus-chart")
+async def get_focus_chart():
+    """Generate and return focus chart for the current session"""
+    global focus_score_history
+    
+    try:
+        if not focus_score_history:
+            return {
+                "success": False,
+                "error": "No focus data available for chart generation"
+            }
+        
+        # Generate chart
+        png_path, chart_b64_bytes = generate_focus_chart_base64(focus_score_history)
+        
+        # Generate session stats
+        session_stats = generate_session_stats(focus_score_history)
+        
+        return {
+            "success": True,
+            "chart_base64": chart_b64_bytes.decode("ascii"),
+            "session_stats": session_stats,
+            "png_filename": png_path,
+            "data_points": len(focus_score_history)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating focus chart: {str(e)}")
+
+@app.post("/reset-focus-session")
+async def reset_focus_session():
+    """Reset focus score history for a new session"""
+    global focus_score_history
+    focus_score_history = []
+    return {"success": True, "message": "Focus session reset"}
+
+@app.get("/focus-session-stats")
+async def get_focus_session_stats():
+    """Get current session statistics"""
+    global focus_score_history
+    
+    if not focus_score_history:
+        return {"data_points": 0, "session_active": False}
+    
+    stats = generate_session_stats(focus_score_history)
+    return {
+        "data_points": len(focus_score_history),
+        "session_active": True,
+        "stats": stats
+    }
 
 @app.post("/get-voice-nudge")
 async def get_voice_nudge():
@@ -96,7 +172,7 @@ async def get_voice_nudge():
     try:
         # Run nudge.py script with 'voice' argument and current attention score
         result = subprocess.run(
-            ["python", "nudge.py", "voice", str(attention_score)], 
+            ["python3", "nudge.py", "voice", str(attention_score)], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -115,7 +191,8 @@ async def get_voice_nudge():
                     "audio_url": audio_url,
                     "audio_file": audio_filename,
                     "source": output_data.get("source", "David Goggins AI"),
-                    "nudge_type": "voice"
+                    "nudge_type": "voice",
+                    "attention_score": attention_score  # Include current attention score
                 }
             else:
                 raise HTTPException(status_code=500, detail=f"Voice nudge script error: {output_data.get('error', 'Unknown error')}")
@@ -127,6 +204,45 @@ async def get_voice_nudge():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error running voice nudge script: {str(e)}")
 
+class VoiceAudioRequest(BaseModel):
+    message: str
+
+@app.post("/generate-voice-audio")
+async def generate_voice_audio(request: VoiceAudioRequest):
+    """Generate voice audio for a specific message without getting a new quote"""
+    try:
+        # Use nudge.py to generate audio for the provided message
+        result = subprocess.run(
+            ["python3", "nudge.py", "generate_audio", request.message], 
+            capture_output=True, 
+            text=True, 
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if result.returncode == 0:
+            # Parse JSON output from nudge.py
+            output_data = json.loads(result.stdout.strip())
+            if output_data.get("success"):
+                audio_filename = output_data.get("audio_file")
+                audio_url = f"/audio/{audio_filename}" if audio_filename else None
+                
+                return {
+                    "success": True,
+                    "message": request.message,
+                    "audio_url": audio_url,
+                    "audio_file": audio_filename,
+                    "source": "David Goggins AI"
+                }
+            else:
+                raise HTTPException(status_code=500, detail=f"Audio generation error: {output_data.get('error', 'Unknown error')}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Script execution failed: {result.stderr}")
+            
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse script output: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating voice audio: {str(e)}")
+
 @app.post("/get-notification-nudge")
 async def get_notification_nudge():
     """Send a system notification by running nudge.py script with notification argument"""
@@ -134,7 +250,7 @@ async def get_notification_nudge():
     try:
         # Run nudge.py script with 'notification' argument and current attention score
         result = subprocess.run(
-            ["python", "nudge.py", "notification", str(attention_score)], 
+            ["python3", "nudge.py", "notification", str(attention_score)], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -147,7 +263,7 @@ async def get_notification_nudge():
                 return {
                     "success": True,
                     "message": output_data["message"],
-                    "source": output_data.get("source", "David Goggins AI"),
+                    "source": output_data.get("source", "AI study coach"),
                     "nudge_type": "notification",
                     "platform": output_data.get("platform", "unknown")
                 }
@@ -160,6 +276,43 @@ async def get_notification_nudge():
         raise HTTPException(status_code=500, detail=f"Failed to parse script output: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error running notification nudge script: {str(e)}")
+
+@app.post("/get-break-nudge")
+async def get_break_nudge():
+    """Get a motivational break message for Pomodoro breaks"""
+    try:
+        # Run nudge.py script with 'break' argument (no attention score needed for breaks)
+        result = subprocess.run(
+            ["python3", "nudge.py", "break"], 
+            capture_output=True, 
+            text=True, 
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if result.returncode == 0:
+            # Parse JSON output from nudge.py
+            output_data = json.loads(result.stdout.strip())
+            if output_data.get("success"):
+                audio_filename = output_data.get("audio_file")
+                audio_url = f"/audio/{audio_filename}" if audio_filename else None
+                
+                return {
+                    "success": True,
+                    "message": output_data["message"],
+                    "audio_url": audio_url,
+                    "audio_file": audio_filename,
+                    "source": output_data.get("source", "David Goggins Break Coach"),
+                    "nudge_type": "break"
+                }
+            else:
+                raise HTTPException(status_code=500, detail=f"Break nudge script error: {output_data.get('error', 'Unknown error')}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Script execution failed: {result.stderr}")
+            
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse script output: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running break nudge script: {str(e)}")
 
 # Keep the old endpoint for backward compatibility
 @app.post("/get-nudge-quote")

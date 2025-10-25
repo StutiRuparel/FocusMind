@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import uuid
+import random
 import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
@@ -21,6 +22,78 @@ client = OpenAI(api_key=api_key)
 # Create audio directory if it doesn't exist
 audio_dir = Path("audio_files")
 audio_dir.mkdir(exist_ok=True)
+
+def break_nudge():
+    """Generate a motivational break message with voiceover using OpenAI for Pomodoro breaks"""
+    try:
+        system_prompt = """You are David Goggins giving advice for taking a productive break during Pomodoro sessions.
+
+Guidelines:
+- Encourage the user to take a REAL break (not phone/social media)
+- Suggest physical activities: stretch, walk, drink water, do push-ups, talk to someone
+- Keep it energetic and motivating but focused on recovery
+- Remind them that breaks make them stronger and more focused
+- Keep it under 30 words
+
+
+Examples: "Break time! Get up, stretch those muscles, hydrate your body. Real recovery, not phone time. Come back stronger!"
+"""
+
+        break_prompts = [
+            "Time for a break! What should I do to recharge properly?",
+            "Pomodoro session complete! How should I use this break to come back stronger?",
+            "Session done! What's the best way to recover and reset?",
+            "Time to take a break! How do I make it count?"
+        ]
+        
+        user_prompt = random.choice(break_prompts)
+        
+        # Generate text
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            max_tokens=100,
+            temperature=0.8  # Add some randomness for variety
+        )
+        
+        message = response.choices[0].message.content
+        
+        # Generate audio using OpenAI TTS
+        audio_filename = f"break_nudge_{uuid.uuid4().hex[:8]}.mp3"
+        audio_path = audio_dir / audio_filename
+        
+        tts_response = client.audio.speech.create(
+            model="tts-1",
+            voice="onyx",  # Deep, authoritative voice similar to David Goggins
+            input=message,
+            speed=1.0
+        )
+        
+        # Save audio file
+        tts_response.stream_to_file(audio_path)
+        
+        # Return as JSON for easy parsing
+        result = {
+            "success": True,
+            "message": message,
+            "audio_file": audio_filename,
+            "audio_path": str(audio_path),
+            "source": "David Goggins Break Coach",
+            "nudge_type": "break"
+        }
+        
+        print(json.dumps(result))
+        
+    except Exception as e:
+        error_result = {
+            "success": False,
+            "error": str(e),
+            "nudge_type": "break"
+        }
+        print(json.dumps(error_result))
 
 def voice_nudge(attention_score=100):
     """Generate a motivational quote with voiceover using OpenAI based on attention score"""
@@ -53,9 +126,18 @@ Guidelines:
 - If score is 40-59: Strong wake-up call to get serious
 - If score is <40: Maximum intensity reality check
 
-Keep it under {max_words}. Be authentic to David Goggins' style but adjust intensity appropriately."""
+Keep it under {max_words}."""
 
-        user_prompt = f"My attention score has dropped to {attention_score}. I need motivation to get back on track with studying."
+        # Add variety to prompts to ensure different messages each time
+        variety_prompts = [
+            f"My attention score has dropped to {attention_score}. I need motivation to get back on track with studying.",
+            f"I'm losing focus and my score is at {attention_score}. Hit me with some motivation.",
+            f"My concentration is slipping to {attention_score}/100. I need a reality check to refocus.",
+            f"Attention score: {attention_score}. I need you to get me back in the zone.",
+            f"I'm at {attention_score}/100 focus level. Give me the push I need to study harder."
+        ]
+        
+        user_prompt = random.choice(variety_prompts)
         
         # Generate text
         response = client.chat.completions.create(
@@ -64,7 +146,8 @@ Keep it under {max_words}. Be authentic to David Goggins' style but adjust inten
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            max_completion_tokens=150
+            max_tokens=150,
+            temperature=0.8  # Add some randomness for variety
         )
         
         message = response.choices[0].message.content
@@ -89,7 +172,7 @@ Keep it under {max_words}. Be authentic to David Goggins' style but adjust inten
             "message": message,
             "audio_file": audio_filename,
             "audio_path": str(audio_path),
-            "source": "David Goggins AI with Voice",
+            "source": "AI study coach with Voice",
             "nudge_type": "voice"
         }
         
@@ -124,13 +207,13 @@ def notification_nudge(attention_score=100):
             max_words = "25 words"
             examples = "'WAKE UP! You're wasting precious time!' or 'STOP! Your future depends on this moment!'"
         
-        system_prompt = f"""You are David Goggins. The user's attention score is {attention_score}/100.
+        system_prompt = f"""You are a motivational study coach loosely based off David Goggins. The user's attention score is {attention_score}/100.
         
 Generate a short, punchy notification message (max {max_words}) using a {tone} approach.
 
 Examples for this score level: {examples}
 
-Be direct, motivating, and authentic to David Goggins' style but adjust intensity based on how low the attention score is."""
+Be direct and motivating but adjust intensity based on how low the attention score is."""
 
         user_prompt = f"My attention score is {attention_score}. I need a notification to refocus."
         
@@ -141,7 +224,7 @@ Be direct, motivating, and authentic to David Goggins' style but adjust intensit
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            max_completion_tokens=50
+            max_tokens=50
         )
         
         message = response.choices[0].message.content
@@ -164,7 +247,7 @@ Be direct, motivating, and authentic to David Goggins' style but adjust intensit
         result = {
             "success": True,
             "message": message,
-            "source": "David Goggins AI Notification",
+            "source": "AI Notification",
             "nudge_type": "notification",
             "platform": sys.platform
         }
@@ -181,26 +264,65 @@ Be direct, motivating, and authentic to David Goggins' style but adjust intensit
 
 if __name__ == "__main__":
     # Check command line arguments to determine which nudge to run
-    # Usage: python nudge.py [voice|notification] [attention_score]
+    # Usage: python nudge.py [voice|notification|break|generate_audio] [attention_score|message]
     nudge_type = "voice"  # default
     attention_score = 100  # default
     
     if len(sys.argv) > 1:
         nudge_type = sys.argv[1]
     
-    if len(sys.argv) > 2:
-        try:
-            attention_score = int(sys.argv[2])
-            # Ensure attention score is within valid range
-            attention_score = max(0, min(100, attention_score))
-        except ValueError:
-            print(json.dumps({"error": "Attention score must be a number between 0 and 100"}))
-            exit(1)
-    
-    if nudge_type == "voice":
-        voice_nudge(attention_score)
-    elif nudge_type == "notification":
-        notification_nudge(attention_score)
+    if nudge_type == "generate_audio":
+        # For generate_audio, the second argument is the message to convert to audio
+        if len(sys.argv) > 2:
+            message = sys.argv[2]
+            try:
+                # Generate audio for the provided message
+                audio_filename = f"message_{uuid.uuid4()}.mp3"
+                audio_path = audio_dir / audio_filename
+                
+                # Use OpenAI TTS to generate speech
+                response = client.audio.speech.create(
+                    model="tts-1",
+                    voice="onyx",  # David Goggins-like voice
+                    input=message,
+                    speed=1.0
+                )
+                
+                # Save audio file
+                response.stream_to_file(audio_path)
+                
+                result = {
+                    "success": True,
+                    "message": message,
+                    "audio_file": audio_filename,
+                    "source": "David Goggins AI"
+                }
+                print(json.dumps(result))
+            except Exception as e:
+                error_result = {
+                    "success": False,
+                    "error": str(e)
+                }
+                print(json.dumps(error_result))
+        else:
+            print(json.dumps({"error": "Message required for generate_audio command"}))
     else:
-        print(json.dumps({"error": f"Unknown nudge type: {nudge_type}. Use 'voice' or 'notification'"}))
-        exit(1)
+        # Original logic for other commands
+        if len(sys.argv) > 2:
+            try:
+                attention_score = int(sys.argv[2])
+                # Ensure attention score is within valid range
+                attention_score = max(0, min(100, attention_score))
+            except ValueError:
+                print(json.dumps({"error": "Attention score must be a number between 0 and 100"}))
+                exit(1)
+        
+        if nudge_type == "voice":
+            voice_nudge(attention_score)
+        elif nudge_type == "notification":
+            notification_nudge(attention_score)
+        elif nudge_type == "break":
+            break_nudge()  # Break nudges don't need attention score
+        else:
+            print(json.dumps({"error": f"Unknown nudge type: {nudge_type}. Use 'voice', 'notification', 'break', or 'generate_audio'"}))
+            exit(1)
