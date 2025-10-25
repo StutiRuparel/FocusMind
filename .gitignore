@@ -1,3 +1,30 @@
+# Environment variables
+.env
+
+# Virtual environment
 venv/
-venv_mp/
-venv_py313/
+env/
+
+# Node modules
+frontend/node_modules/
+frontend/build/
+
+# Audio files (generated dynamically)
+audio_files/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
