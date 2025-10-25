@@ -653,14 +653,28 @@ function App() {
       {/* FUNCTIONAL Pomodoro Timer */}
       <div style={{ 
         margin: '2rem auto', 
-        padding: '2rem', 
-        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        borderRadius: '16px',
-        maxWidth: '400px',
+        padding: '3rem', 
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: '24px',
+        maxWidth: '500px',
         textAlign: 'center',
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 25px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+        border: '1px solid rgba(255, 255, 255, 0.5)',
+        position: 'relative',
+        zIndex: 1
       }}>
-        <h2 style={{ margin: '0 0 1rem 0', color: '#1f2937' }}>
+        <h2 style={{ 
+          margin: '0 0 1.5rem 0', 
+          fontSize: '2rem',
+          fontWeight: '800',
+          background: 'linear-gradient(135deg, #667eea, #764ba2)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          letterSpacing: '-0.02em'
+        }}>
           🍅 Pomodoro Timer
         </h2>
         
