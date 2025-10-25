@@ -34,19 +34,10 @@ MODEL_POINTS = np.array(
     dtype=np.float32,
 )
 
-# -------------------------------------------------------------
-# 3️⃣  Helper to turn normalized landmarks into pixel coords
-# -------------------------------------------------------------
-def norm_to_px(lm, w, h):
-    """lm is a mediapipe NormalizedLandmark, w/h are image dimensions."""
-    return np.array([int(lm.x * w), int(lm.y * h)])
-
 
 # Convert a smoothed eye gaze vector back to a textual label
 def gaze_vector_to_label(vec, cfg):
     dx, dy = vec
-    # averaged_horiz_threshold = (cfg["left_thresh"] + 0.3) / 2
-    # average_vertical_threshold = ()
     if dx < cfg["left_thresh"]:
         return "Right"
     if dx > cfg["right_thresh"]:
@@ -57,7 +48,6 @@ def gaze_vector_to_label(vec, cfg):
         return "Up"
 
     return "Center"
-
 
 
 def compute_iris_center(pts, indices):
@@ -383,16 +373,6 @@ if __name__ == "__main__":
             # use first detected face (we're only tracking one face)
             lm = results.multi_face_landmarks[0].landmark
             pts = landmarks_to_np_array(lm, frame.shape)
-
-            # # ---- extract the five points for each eye -----------------
-            # def get_eye_pts(idx_map):
-            #     return {
-            #         "outer": norm_to_px(lm[idx_map["outer"]], w, h),
-            #         "inner": norm_to_px(lm[idx_map["inner"]], w, h),
-            #         "upper": norm_to_px(lm[idx_map["upper"]], w, h),
-            #         "lower": norm_to_px(lm[idx_map["lower"]], w, h),
-            #         "iris":  norm_to_px(lm[idx_map["iris"]],  w, h),
-            #     }
 
             # Pull the five landmarks for each eye
             right_pts = get_eye_pts(RIGHT_EYE, lm, w, h)

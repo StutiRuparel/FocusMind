@@ -52,7 +52,7 @@ def calibrate_user(
             "top_thresh" : float,   # top‑side boundary
             "down_thresh" : float,   # bottom‑side boundary
         }
-    The dict is also written to *gaze_calibration.json* in the current folder.
+    The dict is also written to *gaze_calibration_parameters.json* in the current folder.
     """
     prompts = [
         ("Look CENTER",   None),
@@ -146,7 +146,7 @@ def calibrate_user(
     with open("gaze_calibration_parameters.json", "w") as f:
         json.dump(cfg, f, indent=2)
 
-    print("Calibration finished – thresholds saved to gaze_calibration.json")
+    print("Calibration finished – thresholds saved to gaze_calibration_parameters.json")
     cv2.destroyWindow("Calibration")
     return cfg
 
