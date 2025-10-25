@@ -1,9 +1,12 @@
 import os
 import subprocess
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from openai import OpenAI
 from pydantic import BaseModel
 import random
@@ -15,6 +18,13 @@ attention_score = 100
 load_dotenv()
 
 app = FastAPI(title="FocusMind API", description="Motivational Study Coach API")
+
+# Create audio directory if it doesn't exist
+audio_dir = Path("audio_files")
+audio_dir.mkdir(exist_ok=True)
+
+# Mount static files for audio serving
+app.mount("/audio", StaticFiles(directory="audio_files"), name="audio")
 
 # Add CORS middleware to allow React frontend to connect
 app.add_middleware(
@@ -79,13 +89,52 @@ async def decrease_attention():
     attention_score = max(0, attention_score - 15)  # Don't go below 0
     return {"attention_score": attention_score, "message": f"Attention score decreased to {attention_score}"}
 
-@app.post("/get-nudge-quote")
-async def get_nudge_quote():
-    """Get a motivational quote by running nudge.py script"""
+@app.post("/get-voice-nudge")
+async def get_voice_nudge():
+    """Get a motivational quote with voiceover by running nudge.py script with voice argument"""
+    global attention_score
     try:
-        # Run nudge.py script and capture output
+        # Run nudge.py script with 'voice' argument and current attention score
         result = subprocess.run(
-            ["python", "nudge.py"], 
+            ["python", "nudge.py", "voice", str(attention_score)], 
+            capture_output=True, 
+            text=True, 
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if result.returncode == 0:
+            # Parse JSON output from nudge.py
+            output_data = json.loads(result.stdout.strip())
+            if output_data.get("success"):
+                audio_filename = output_data.get("audio_file")
+                audio_url = f"/audio/{audio_filename}" if audio_filename else None
+                
+                return {
+                    "success": True,
+                    "message": output_data["message"],
+                    "audio_url": audio_url,
+                    "audio_file": audio_filename,
+                    "source": output_data.get("source", "David Goggins AI"),
+                    "nudge_type": "voice"
+                }
+            else:
+                raise HTTPException(status_code=500, detail=f"Voice nudge script error: {output_data.get('error', 'Unknown error')}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Script execution failed: {result.stderr}")
+            
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse script output: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running voice nudge script: {str(e)}")
+
+@app.post("/get-notification-nudge")
+async def get_notification_nudge():
+    """Send a system notification by running nudge.py script with notification argument"""
+    global attention_score
+    try:
+        # Run nudge.py script with 'notification' argument and current attention score
+        result = subprocess.run(
+            ["python", "nudge.py", "notification", str(attention_score)], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -98,17 +147,25 @@ async def get_nudge_quote():
                 return {
                     "success": True,
                     "message": output_data["message"],
-                    "source": output_data.get("source", "David Goggins AI")
+                    "source": output_data.get("source", "David Goggins AI"),
+                    "nudge_type": "notification",
+                    "platform": output_data.get("platform", "unknown")
                 }
             else:
-                raise HTTPException(status_code=500, detail=f"Nudge script error: {output_data.get('error', 'Unknown error')}")
+                raise HTTPException(status_code=500, detail=f"Notification nudge script error: {output_data.get('error', 'Unknown error')}")
         else:
             raise HTTPException(status_code=500, detail=f"Script execution failed: {result.stderr}")
             
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse script output: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error running nudge script: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error running notification nudge script: {str(e)}")
+
+# Keep the old endpoint for backward compatibility
+@app.post("/get-nudge-quote")
+async def get_nudge_quote():
+    """Get a motivational quote with voiceover (backward compatibility - calls voice nudge)"""
+    return await get_voice_nudge()
 
 if __name__ == "__main__":
     import uvicorn

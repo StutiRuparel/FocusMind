@@ -9,6 +9,9 @@ env/
 frontend/node_modules/
 frontend/build/
 
+# Audio files (generated dynamically)
+audio_files/
+
 # Python cache files
 __pycache__/
 *.pyc
