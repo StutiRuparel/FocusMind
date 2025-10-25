@@ -7,6 +7,11 @@ import cv2
 import mediapipe as mp
 import numpy as np
 
+from ema_smoother import GazeSmoother
+from face_tracking_utils import RIGHT_EYE, LEFT_EYE, get_eye_pts, eye_gaze_vector, landmarks_to_np_array
+from calibration import calibrate_user, load_calibration
+
+
 # Landmark groupings used for the additional analytics.
 HEAD_POSE_LANDMARKS = [1, 152, 33, 263, 61, 291]
 LEFT_IRIS_INDICES = [468, 469, 470, 471, 472]
@@ -29,36 +34,31 @@ MODEL_POINTS = np.array(
     dtype=np.float32,
 )
 
-
-# -------------------------------------------------------------
-# 1️⃣  Command‑line argument – path to video (or 0 for webcam)
-# -------------------------------------------------------------
-parser = argparse.ArgumentParser(description="Facial‑expression demo with MediaPipe")
-parser.add_argument("video_path", help="Path to video file, or 0 for webcam")
-args = parser.parse_args()
-
-# -------------------------------------------------------------
-# 2️⃣  Initialise MediaPipe Face‑Mesh
-# -------------------------------------------------------------
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    static_image_mode=False,
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5,
-)
-
 # -------------------------------------------------------------
 # 3️⃣  Helper to turn normalized landmarks into pixel coords
 # -------------------------------------------------------------
-def landmarks_to_np(landmarks, img_shape):
-    h, w = img_shape[:2]
-    points = np.array(
-        [(int(l.x * w), int(l.y * h)) for l in landmarks],
-        dtype=np.int32,
-    )
-    return points
+def norm_to_px(lm, w, h):
+    """lm is a mediapipe NormalizedLandmark, w/h are image dimensions."""
+    return np.array([int(lm.x * w), int(lm.y * h)])
+
+
+# Convert a smoothed eye gaze vector back to a textual label
+def gaze_vector_to_label(vec, cfg):
+    dx, dy = vec
+    # averaged_horiz_threshold = (cfg["left_thresh"] + 0.3) / 2
+    # average_vertical_threshold = ()
+    if dx < cfg["left_thresh"]:
+        return "Right"
+    if dx > cfg["right_thresh"]:
+        return "Left"
+    if dy < cfg["top_thresh"]:
+        return "Down"
+    if dy > cfg["down_thresh"]:
+        return "Up"
+
+    return "Center"
+
+
 
 def compute_iris_center(pts, indices):
     """Average the supplied landmark indices to approximate the iris centre."""
@@ -211,9 +211,7 @@ def determine_head_direction(pitch, yaw, pitch_thresh=10.0, yaw_thresh=10.0, for
             return "Up"
     return "Forward"
 
-# -------------------------------------------------------------
-# 4️⃣  Simple expression rules (you can tune the thresholds)
-# -------------------------------------------------------------
+# Simple expression rules (you can tune the thresholds)
 def infer_expression(pts):
     # indices correspond to the 68‑point scheme used in many papers
     mouth_left = pts[61]   # left corner
@@ -246,9 +244,7 @@ def infer_expression(pts):
     return "Neutral"
 
 
-# -------------------------------------------------------------
-# 4b️⃣  Eye aspect ratio helpers
-# -------------------------------------------------------------
+# Eye aspect ratio helpers
 def compute_average_ear(pts):
     """Return the average eye aspect ratio (EAR) across both eyes."""
     left_eye_height = np.linalg.norm(pts[159] - pts[145])
@@ -314,147 +310,202 @@ def update_blink_metrics(
     )
 
 
-# -------------------------------------------------------------
-# 5️⃣  Open video source
-# -------------------------------------------------------------
-# 0 selects the default webcam; passing a path still works for recorded clips.
-source_arg = args.video_path
-source = int(source_arg) if source_arg.isdigit() else source_arg
-cap = cv2.VideoCapture(source)
-if not cap.isOpened():
-    raise RuntimeError(f"Cannot open video source: {source}")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Facial‑expression demo with MediaPipe")
+    parser.add_argument("video_path", help="Path to video file, or 0 for webcam")
+    args = parser.parse_args()
+
+    # Open video source
+    # 0 selects the default webcam; passing a path still works for recorded clips.
+    source_arg = args.video_path
+    source = int(source_arg) if source_arg.isdigit() else source_arg
+    cap = cv2.VideoCapture(source)
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video source: {source}")
+
+    # Initialise MediaPipe Face‑Mesh
+    mp_face_mesh = mp.solutions.face_mesh
+    face_mesh = mp_face_mesh.FaceMesh(
+        static_image_mode=False,
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
 
 
-# -------------------------------------------------------------
-# 6️⃣  Main processing loop
-# -------------------------------------------------------------
-# These track closed-eye duration, blinking, and keep-alive stats across frames.
-eyes_closed_start_time = None
-eyes_closed_duration = 0.0
-blink_in_progress = False
-blink_count = 0
-session_start_time = time.perf_counter()
-# Rolling buffers for smoothing.
-eye_horizontal_history = deque(maxlen=5)
-eye_vertical_history = deque(maxlen=5)
-head_pitch_history = deque(maxlen=5)
-head_yaw_history = deque(maxlen=5)
+    # Main processing loop
+    # These track closed-eye duration, blinking, and keep-alive stats across frames.
+    eyes_closed_start_time = None
+    eyes_closed_duration = 0.0
+    blink_in_progress = False
+    blink_count = 0
+    session_start_time = time.perf_counter()
+    # Rolling buffers for smoothing.
+    eye_horizontal_history = deque(maxlen=5)
+    eye_vertical_history = deque(maxlen=5)
+    head_pitch_history = deque(maxlen=5)
+    head_yaw_history = deque(maxlen=5)
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Finished processing video.")
-        break
+    smoother = GazeSmoother(alpha=0.3)
 
-    current_time = time.perf_counter()
-
-    # MediaPipe expects RGB
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(rgb)
-
-    face_present = bool(results.multi_face_landmarks)
     expression = None
     eyes_open_ratio = 0.0
     eye_direction = None
     head_direction = None
+    gaze_label = ""
 
-    if face_present:
-        landmarks = results.multi_face_landmarks[0].landmark
-        pts = landmarks_to_np(landmarks, frame.shape)
+    # Either load a calibration or prompt a new calibration run
+    # cfg = load_calibration()
+    cfg = calibrate_user(
+        cap, face_mesh,
+        int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+        int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        get_eye_pts, eye_gaze_vector, smoothing_alpha=0.2
+    )
 
-        # draw a few key points for visual feedback (mouth corners, lip centre, eyelid points)
-        for idx in (61, 291, 13, 14, 159, 145, 386, 374, 33, 133, 362, 263):
-            cv2.circle(frame, tuple(pts[idx]), 2, (0, 255, 0), -1)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("Finished processing video.")
+            break
 
-        # Existing facial expression logic is untouched.
-        expression = infer_expression(pts)
+        current_time = time.perf_counter()
 
-        avg_ear = compute_average_ear(pts)
-        eyes_open_ratio = normalize_ear(avg_ear)
+        # MediaPipe expects RGB
+        h, w = frame.shape[:2]
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = face_mesh.process(rgb)
 
-        (
-            blink_in_progress,
-            blink_count,
-            eyes_closed_start_time,
-            eyes_closed_duration,
-            _,
-        ) = update_blink_metrics(
-            eyes_open_ratio,
-            current_time,
-            blink_in_progress,
-            blink_count,
-            eyes_closed_start_time,
-            eyes_closed_duration,
-        )
+        face_present = bool(results.multi_face_landmarks)
 
-        # Head direction derived from smoothed pitch/yaw estimates.
-        orientation = estimate_head_orientation(pts, frame.shape)
-        if orientation is not None:
-            pitch, yaw = orientation
-            head_pitch_history.append(pitch)
-            head_yaw_history.append(yaw)
-            if head_pitch_history and head_yaw_history:
-                avg_pitch = float(np.mean(head_pitch_history))
-                avg_yaw = float(np.mean(head_yaw_history))
-                head_direction = determine_head_direction(avg_pitch, avg_yaw)
+        if face_present:
+            # use first detected face (we're only tracking one face)
+            lm = results.multi_face_landmarks[0].landmark
+            pts = landmarks_to_np_array(lm, frame.shape)
 
-        # Eye direction derived from smoothed iris ratios.
-        horizontal_ratio, vertical_ratio = compute_gaze_ratios(pts)
-        if horizontal_ratio is not None and vertical_ratio is not None:
-            eye_horizontal_history.append(horizontal_ratio)
-            eye_vertical_history.append(vertical_ratio)
-            if eye_horizontal_history and eye_vertical_history:
-                avg_horizontal = float(np.mean(eye_horizontal_history))
-                avg_vertical = float(np.mean(eye_vertical_history))
-                eye_direction = determine_eye_direction(avg_horizontal, avg_vertical)
+            # # ---- extract the five points for each eye -----------------
+            # def get_eye_pts(idx_map):
+            #     return {
+            #         "outer": norm_to_px(lm[idx_map["outer"]], w, h),
+            #         "inner": norm_to_px(lm[idx_map["inner"]], w, h),
+            #         "upper": norm_to_px(lm[idx_map["upper"]], w, h),
+            #         "lower": norm_to_px(lm[idx_map["lower"]], w, h),
+            #         "iris":  norm_to_px(lm[idx_map["iris"]],  w, h),
+            #     }
+
+            # Pull the five landmarks for each eye
+            right_pts = get_eye_pts(RIGHT_EYE, lm, w, h)
+            left_pts  = get_eye_pts(LEFT_EYE, lm, w, h)
+
+            vec_r = eye_gaze_vector(right_pts)
+            vec_l = eye_gaze_vector(left_pts)
+
+            # Average the two raw eyes to reduce bias from head roll etc.
+            raw_vec = (vec_r + vec_l) / 2.0
+            smoothed_vec = smoother.update(raw_vec)
+            gaze_label = gaze_vector_to_label(smoothed_vec, cfg)
+
+            # ---- draw a few landmarks (optional visual sanity check) ----
+            for pt in (right_pts["outer"], right_pts["inner"], right_pts["iris"],
+                    left_pts["outer"], left_pts["inner"], left_pts["iris"]):
+                cv2.circle(frame, tuple(pt), 2, (0, 255, 0), -1)
+
+
+            # draw a few key points for visual feedback (mouth corners, lip centre, eyelid points)
+            for idx in (61, 291, 13, 14, 159, 145, 386, 374, 33, 133, 362, 263):
+                cv2.circle(frame, tuple(pts[idx]), 2, (0, 255, 0), -1)
+            
+            # Existing facial expression logic is untouched.
+            expression = infer_expression(pts)
+
+            avg_ear = compute_average_ear(pts)
+            eyes_open_ratio = normalize_ear(avg_ear)
+
+            (
+                blink_in_progress,
+                blink_count,
+                eyes_closed_start_time,
+                eyes_closed_duration,
+                _,
+            ) = update_blink_metrics(
+                eyes_open_ratio,
+                current_time,
+                blink_in_progress,
+                blink_count,
+                eyes_closed_start_time,
+                eyes_closed_duration,
+            )
+
+            # Head direction derived from smoothed pitch/yaw estimates.
+            orientation = estimate_head_orientation(pts, frame.shape)
+            if orientation is not None:
+                pitch, yaw = orientation
+                head_pitch_history.append(pitch)
+                head_yaw_history.append(yaw)
+                if head_pitch_history and head_yaw_history:
+                    avg_pitch = float(np.mean(head_pitch_history))
+                    avg_yaw = float(np.mean(head_yaw_history))
+                    head_direction = determine_head_direction(avg_pitch, avg_yaw)
+
+            # Eye direction derived from smoothed iris ratios.
+            horizontal_ratio, vertical_ratio = compute_gaze_ratios(pts)
+            if horizontal_ratio is not None and vertical_ratio is not None:
+                eye_horizontal_history.append(horizontal_ratio)
+                eye_vertical_history.append(vertical_ratio)
+                if eye_horizontal_history and eye_vertical_history:
+                    avg_horizontal = float(np.mean(eye_horizontal_history))
+                    avg_vertical = float(np.mean(eye_vertical_history))
+                    eye_direction = determine_eye_direction(avg_horizontal, avg_vertical)
+            else:
+                eye_horizontal_history.clear()
+                eye_vertical_history.clear()
         else:
+            eyes_closed_start_time = None
+            eyes_closed_duration = 0.0
+            blink_in_progress = False
             eye_horizontal_history.clear()
             eye_vertical_history.clear()
-    else:
-        eyes_closed_start_time = None
-        eyes_closed_duration = 0.0
-        blink_in_progress = False
-        eye_horizontal_history.clear()
-        eye_vertical_history.clear()
-        head_pitch_history.clear()
-        head_yaw_history.clear()
+            head_pitch_history.clear()
+            head_yaw_history.clear()
 
-    elapsed_minutes = max((current_time - session_start_time) / 60.0, 1e-6)
-    blink_rate = (blink_count / elapsed_minutes) if blink_count else 0.0
+        elapsed_minutes = max((current_time - session_start_time) / 60.0, 1e-6)
+        blink_rate = (blink_count / elapsed_minutes) if blink_count else 0.0
 
-    # Overlay telemetry in the top-left corner for live debugging.
-    hud_lines = [
-        f"Face: {'Yes' if face_present else 'No'}",
-        f"Expression: {expression}" if expression else "Expression: --",
-        f"Eye openness: {eyes_open_ratio:.2f}",
-        f"Eyes closed: {eyes_closed_duration:.1f}s",
-        f"Blink rate: {blink_rate:.1f} blinks/min",
-    ]
+        # Overlay telemetry in the top-left corner for live debugging.
+        hud_lines = [
+            f"Face: {'Yes' if face_present else 'No'}",
+            f"Expression: {expression}" if expression else "Expression: --",
+            f"Eye openness: {eyes_open_ratio:.2f}",
+            f"Eyes closed: {eyes_closed_duration:.1f}s",
+            f"Blink rate: {blink_rate:.1f} blinks/min",
+            f"Gaze dir: {gaze_label}"
+        ]
 
-    if eye_direction is not None:
-        hud_lines.append(f"Eye direction: {eye_direction}")
+        if eye_direction is not None:
+            hud_lines.append(f"Eye direction: {eye_direction}")
 
-    if head_direction is not None:
-        hud_lines.append(f"Head direction: {head_direction}")
+        if head_direction is not None:
+            hud_lines.append(f"Head direction: {head_direction}")
 
-    y = 30
-    for line in hud_lines:
-        cv2.putText(
-            frame,
-            line,
-            (30, y),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
-            (0, 0, 255),
-            2,
-        )
-        y += 30
+        y = 30
+        for line in hud_lines:
+            cv2.putText(
+                frame,
+                line,
+                (30, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (0, 0, 255),
+                2,
+            )
+            y += 30
 
-    cv2.imshow("MediaPipe Facial Expression", frame)
+        cv2.imshow("MediaPipe Facial Expression", frame)
 
-    # Esc to quit early
-    if cv2.waitKey(1) & 0xFF == 27:
-        break
+        # Esc to quit early
+        if cv2.waitKey(1) & 0xFF == 27:
+            break
 
-cap.release()
-cv2.destroyAllWindows()
+    cap.release()
+    cv2.destroyAllWindows()
