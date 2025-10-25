@@ -1,30 +1,48 @@
 import os
+import json
 from dotenv import load_dotenv
 from openai import OpenAI
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize client with API key from environment variables
+# Initialize OpenAI client
 api_key = os.getenv("OPENAI_API_KEY")
-#print(f"API Key loaded: {'Yes' if api_key else 'No'}")
-#print(f"API Key starts with: {api_key[:10] + '...' if api_key else 'None'}")
+if not api_key:
+    print(json.dumps({"error": "OPENAI_API_KEY not found in environment variables"}))
+    exit(1)
 
 client = OpenAI(api_key=api_key)
 
-try:
-    # Send a request to GPT-4 (more reliable than GPT-5)
-    response = client.chat.completions.create(
-        model="gpt-4",  # Changed to gpt-4 for better compatibility
-        messages=[
-            {"role": "system", "content": "You are a David Goggins motivational study coach."},
-            {"role": "user", "content": "Write a motivational study quote"}
-        ],
-        max_completion_tokens=1500  # response length limit
-    )
-    
-    print(response.choices[0].message.content)
-    
-except Exception as e:
-    print(f"Error occurred: {e}")
-    print(f"Error type: {type(e).__name__}")
+def generate_motivational_quote():
+    """Generate a motivational quote using OpenAI"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are David Goggins. Give an intense, motivational message to get someone focused on studying. Be direct and powerful. Keep it under 100 words."},
+                {"role": "user", "content": "I need motivation to stay focused and study hard."}
+            ],
+            max_completion_tokens=150
+        )
+        
+        message = response.choices[0].message.content
+        
+        # Return as JSON for easy parsing
+        result = {
+            "success": True,
+            "message": message,
+            "source": "David Goggins AI"
+        }
+        
+        print(json.dumps(result))
+        
+    except Exception as e:
+        error_result = {
+            "success": False,
+            "error": str(e)
+        }
+        print(json.dumps(error_result))
+
+if __name__ == "__main__":
+    generate_motivational_quote()

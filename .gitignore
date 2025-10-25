@@ -5,6 +5,10 @@
 venv/
 env/
 
+# Node modules
+frontend/node_modules/
+frontend/build/
+
 # Python cache files
 __pycache__/
 *.pyc
