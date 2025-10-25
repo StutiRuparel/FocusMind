@@ -35,15 +35,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
           
           <div className="actions-section">
-            <button 
-              className="decrease-button"
-              onClick={onDecreaseAttention}
-              disabled={loading}
-              title="Attention will decrease and automatically trigger a voice nudge"
-            >
-              {loading ? 'Loading...' : 'Decrease Attention (-15) 🎤'}
-            </button>
-            
             <div className="nudge-buttons">
               <div className="auto-nudge-info" style={{
                 marginBottom: '1rem',
@@ -63,7 +54,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 disabled={loading}
                 title="Get a new voice nudge (happens automatically when attention drops)"
               >
-                {loading ? 'Loading...' : 'Get New Voice Nudge 🎤'}
+                {loading ? 'Loading...' : 'Get Motivation ⚡'}
               </button>
               
               <button 
@@ -85,33 +76,6 @@ const Dashboard: React.FC<DashboardProps> = ({
               </button>
             </div>
             
-            {/* Debug: Test notification button */}
-            {notificationPermission === 'granted' && (
-              <button 
-                className="test-notification-button"
-                onClick={() => {
-                  console.log('🧪 Testing simple notification...');
-                  if ('Notification' in window && Notification.permission === 'granted') {
-                    new Notification('Test Notification', {
-                      body: 'This is a simple test notification',
-                      icon: '/favicon.ico'
-                    });
-                  }
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  cursor: 'pointer',
-                  marginTop: '0.5rem'
-                }}
-              >
-                🧪 Test Simple Notification
-              </button>
-            )}
             
             {nudgeExecuted && (
               <div className="nudge-indicator voice-indicator">
