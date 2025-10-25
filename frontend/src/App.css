@@ -10,9 +10,9 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0a1628 0%, #0d1b2a 50%, #1b263b 100%);
   background-attachment: fixed;
-  color: #1a202c;
+  color: #ffffff;
   min-height: 100vh;
 }
 
@@ -21,9 +21,10 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow-x: hidden;
 }
 
-/* Animated gradient background overlay */
+/* Lightning effect overlay */
 .App::before {
   content: '';
   position: fixed;
@@ -31,23 +32,40 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
+  background-image: 
+    url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><path d="M200 0 L180 100 L220 100 L190 250 L240 250 L200 400" stroke="%2300a8ff" stroke-width="2" fill="none" opacity="0.3"/><path d="M800 0 L780 120 L820 120 L790 280 L840 280 L810 420" stroke="%2300d4ff" stroke-width="2" fill="none" opacity="0.25"/><path d="M1000 50 L985 140 L1015 140 L990 260" stroke="%230099ff" stroke-width="1.5" fill="none" opacity="0.2"/></svg>');
+  background-size: cover;
+  background-position: top center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* Animated glow overlay */
+.App::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: 
-    radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(99, 102, 241, 0.3), transparent 50%),
-    radial-gradient(circle at 40% 20%, rgba(168, 85, 247, 0.2), transparent 50%);
-  animation: gradient-shift 15s ease infinite;
+    radial-gradient(circle at 20% 20%, rgba(0, 168, 255, 0.1), transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(0, 132, 255, 0.08), transparent 50%);
+  animation: glow-pulse 8s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
 }
 
-@keyframes gradient-shift {
+@keyframes glow-pulse {
   0%, 100% {
-    opacity: 1;
+    opacity: 0.5;
     transform: scale(1);
   }
   50% {
     opacity: 0.8;
-    transform: scale(1.1);
+    transform: scale(1.05);
   }
 }
 
@@ -62,14 +80,14 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 168, 255, 0.4);
   border-radius: 5px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 168, 255, 0.6);
 }

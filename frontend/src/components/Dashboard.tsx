@@ -35,15 +35,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
           
           <div className="actions-section">
-            <button 
-              className="decrease-button"
-              onClick={onDecreaseAttention}
-              disabled={loading}
-              title="Attention will decrease and automatically trigger a voice nudge"
-            >
-              {loading ? 'Loading...' : 'Decrease Attention (-15) 🎤'}
-            </button>
-            
             <div className="nudge-buttons">
               <div className="auto-nudge-info" style={{
                 marginBottom: '1rem',

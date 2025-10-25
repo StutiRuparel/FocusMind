@@ -654,14 +654,14 @@ function App() {
       <div style={{ 
         margin: '2rem auto', 
         padding: '3rem', 
-        background: 'rgba(255, 255, 255, 0.95)',
+        background: 'rgba(13, 27, 42, 0.7)',
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         borderRadius: '24px',
         maxWidth: '500px',
         textAlign: 'center',
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.12), 0 8px 25px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
-        border: '1px solid rgba(255, 255, 255, 0.5)',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 168, 255, 0.2), inset 0 1px 0 rgba(0, 168, 255, 0.1)',
+        border: '1px solid rgba(0, 168, 255, 0.2)',
         position: 'relative',
         zIndex: 1
       }}>
@@ -669,30 +669,33 @@ function App() {
           margin: '0 0 1.5rem 0', 
           fontSize: '2rem',
           fontWeight: '800',
-          background: 'linear-gradient(135deg, #667eea, #764ba2)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          letterSpacing: '-0.02em'
+          color: '#ffffff',
+          letterSpacing: '-0.02em',
+          textShadow: '0 0 20px rgba(0, 168, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5)'
         }}>
           🍅 Pomodoro Timer
         </h2>
         
         <div style={{ 
           fontSize: '0.9rem', 
-          color: '#6b7280',
-          marginBottom: '1rem'
+          color: '#7dd3fc',
+          marginBottom: '1rem',
+          fontWeight: '500'
         }}>
           Session #{pomodoroSessions + 1} • 
           {pomodoroRunning ? ' ⏰ Running' : ' ⏸️ Paused'}
         </div>
         
         <div style={{
-          fontSize: '3rem',
-          fontWeight: 'bold',
-          color: pomodoroTime <= 60 ? '#ef4444' : '#1f2937',
+          fontSize: '3.5rem',
+          fontWeight: '800',
+          color: pomodoroTime <= 60 ? '#ef4444' : '#00d4ff',
           margin: '2rem 0',
-          fontFamily: 'monospace'
+          fontFamily: '"SF Mono", Monaco, monospace',
+          letterSpacing: '0.05em',
+          textShadow: pomodoroTime <= 60 
+            ? '0 0 30px rgba(239, 68, 68, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5)' 
+            : '0 0 30px rgba(0, 212, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.5)'
         }}>
           {formatTime(pomodoroTime)}
         </div>
@@ -702,13 +705,24 @@ function App() {
             <button 
               onClick={startPomodoro}
               style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                padding: '0.875rem 1.75rem',
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
                 color: 'white',
-                border: 'none',
+                border: '1px solid rgba(2, 132, 199, 0.5)',
                 borderRadius: '12px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(2, 132, 199, 0.4), 0 0 40px rgba(2, 132, 199, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(2, 132, 199, 0.6), 0 0 60px rgba(2, 132, 199, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(2, 132, 199, 0.4), 0 0 40px rgba(2, 132, 199, 0.2)';
               }}
             >
               ▶️ Start
@@ -717,13 +731,24 @@ function App() {
             <button 
               onClick={pausePomodoro}
               style={{
-                padding: '0.75rem 1.5rem',
+                padding: '0.875rem 1.75rem',
                 background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 color: 'white',
-                border: 'none',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
                 borderRadius: '12px',
                 fontWeight: '600',
-                cursor: 'pointer'
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(245, 158, 11, 0.6), 0 0 60px rgba(245, 158, 11, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)';
               }}
             >
               ⏸️ Pause
@@ -733,13 +758,24 @@ function App() {
           <button 
             onClick={resetPomodoro}
             style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+              padding: '0.875rem 1.75rem',
+              background: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
               color: 'white',
-              border: 'none',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
               borderRadius: '12px',
               fontWeight: '600',
-              cursor: 'pointer'
+              fontSize: '1rem',
+              cursor: 'pointer',
+              boxShadow: '0 8px 24px rgba(71, 85, 105, 0.4), 0 0 40px rgba(71, 85, 105, 0.2)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 12px 32px rgba(71, 85, 105, 0.6), 0 0 60px rgba(71, 85, 105, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(71, 85, 105, 0.4), 0 0 40px rgba(71, 85, 105, 0.2)';
             }}
           >
             🔄 Reset
@@ -747,14 +783,18 @@ function App() {
         </div>
 
         <div style={{ 
-          marginTop: '1.5rem', 
-          fontSize: '0.85rem', 
-          color: '#6b7280',
-          padding: '1rem',
-          background: '#f3f4f6',
-          borderRadius: '8px'
+          marginTop: '2rem', 
+          fontSize: '0.875rem', 
+          color: '#7dd3fc',
+          padding: '1.25rem 1.5rem',
+          background: 'rgba(0, 168, 255, 0.1)',
+          borderRadius: '12px',
+          border: '1px solid rgba(0, 168, 255, 0.2)',
+          textAlign: 'left',
+          lineHeight: '1.8',
+          boxShadow: 'inset 0 0 20px rgba(0, 168, 255, 0.1)'
         }}>
-          📋 <strong>How it works:</strong><br/>
+          <div style={{ fontWeight: '600', marginBottom: '0.75rem', color: '#ffffff' }}>📋 How it works:</div>
           • Click Start for 25-minute focus session<br/>
           • Timer turns red in final minute<br/>
           • Auto break nudge when timer reaches 0<br/>
@@ -765,12 +805,15 @@ function App() {
         
         {pomodoroTime === 0 && (
           <div style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            background: '#f0fdf4',
-            color: '#16a34a',
-            borderRadius: '8px',
+            marginTop: '1.5rem',
+            padding: '1.25rem 1.5rem',
+            background: 'rgba(16, 185, 129, 0.15)',
+            color: '#34d399',
+            borderRadius: '12px',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
             fontWeight: '600',
+            fontSize: '1rem',
+            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16, 185, 129, 0.1)',
             animation: 'pulse 2s infinite'
           }}>
             🎉 Session Complete! Time for a break!

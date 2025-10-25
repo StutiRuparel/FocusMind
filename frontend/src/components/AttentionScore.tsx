@@ -18,6 +18,12 @@ const AttentionScore: React.FC<AttentionScoreProps> = ({ score }) => {
     return 'Needs Focus';
   };
 
+  // Calculate the circumference of the circle
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius; // ≈ 314.159
+  const strokeDasharray = circumference;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+
   return (
     <div className="attention-score">
       <div className="score-circle">
@@ -26,7 +32,7 @@ const AttentionScore: React.FC<AttentionScoreProps> = ({ score }) => {
           <circle
             cx="60"
             cy="60"
-            r="50"
+            r={radius}
             fill="none"
             stroke="#e2e8f0"
             strokeWidth="8"
@@ -35,13 +41,13 @@ const AttentionScore: React.FC<AttentionScoreProps> = ({ score }) => {
           <circle
             cx="60"
             cy="60"
-            r="50"
+            r={radius}
             fill="none"
             stroke={getScoreColor(score)}
             strokeWidth="8"
             strokeLinecap="round"
-            strokeDasharray={`${(score / 100) * 314} 314`}
-            strokeDashoffset="78.5"
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
             className="progress-circle"
           />
         </svg>

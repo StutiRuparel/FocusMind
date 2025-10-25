@@ -1,14 +1,14 @@
 .header {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(10, 22, 40, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  color: #1a202c;
+  color: #ffffff;
   padding: 2.5rem 1.5rem;
   text-align: center;
   box-shadow: 
-    0 10px 40px rgba(0, 0, 0, 0.1),
-    0 1px 3px rgba(0, 0, 0, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(0, 168, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 168, 255, 0.2);
   position: relative;
   z-index: 10;
 }
@@ -19,23 +19,23 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 2px;
   background: linear-gradient(90deg, 
-    #667eea 0%, 
-    #764ba2 25%, 
-    #f093fb 50%, 
-    #764ba2 75%, 
-    #667eea 100%);
-  background-size: 200% 100%;
-  animation: gradient-flow 3s ease infinite;
+    transparent 0%, 
+    #00a8ff 20%, 
+    #00d4ff 50%, 
+    #00a8ff 80%, 
+    transparent 100%);
+  animation: header-glow 3s ease-in-out infinite;
 }
 
-@keyframes gradient-flow {
+@keyframes header-glow {
   0%, 100% {
-    background-position: 0% 50%;
+    opacity: 0.6;
   }
   50% {
-    background-position: 100% 50%;
+    opacity: 1;
+    filter: brightness(1.5);
   }
 }
 
@@ -48,36 +48,43 @@
   font-size: 3rem;
   font-weight: 800;
   margin: 0 0 1.5rem 0;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: 0 2px 10px rgba(102, 126, 234, 0.1);
-  animation: title-shimmer 3s ease-in-out infinite;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  text-shadow: 
+    0 0 20px rgba(0, 168, 255, 0.5),
+    0 0 40px rgba(0, 168, 255, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: title-glow 4s ease-in-out infinite;
 }
 
-@keyframes title-shimmer {
+@keyframes title-glow {
   0%, 100% {
-    filter: brightness(1);
+    text-shadow: 
+      0 0 20px rgba(0, 168, 255, 0.5),
+      0 0 40px rgba(0, 168, 255, 0.3),
+      0 2px 4px rgba(0, 0, 0, 0.5);
   }
   50% {
-    filter: brightness(1.2);
+    text-shadow: 
+      0 0 30px rgba(0, 168, 255, 0.8),
+      0 0 60px rgba(0, 168, 255, 0.5),
+      0 2px 4px rgba(0, 0, 0, 0.5);
   }
 }
 
 .motivation-message {
-  background: linear-gradient(135deg, 
-    rgba(102, 126, 234, 0.1) 0%, 
-    rgba(118, 75, 162, 0.1) 100%);
+  background: rgba(13, 27, 42, 0.7);
   backdrop-filter: blur(10px);
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 2rem 2.5rem;
   margin-top: 1.5rem;
-  border: 2px solid rgba(102, 126, 234, 0.2);
+  border: 1.5px solid rgba(0, 168, 255, 0.3);
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(0, 168, 255, 0.1);
 }
 
 .motivation-message::before {
@@ -90,7 +97,7 @@
   background: linear-gradient(
     45deg,
     transparent 30%,
-    rgba(255, 255, 255, 0.1) 50%,
+    rgba(0, 168, 255, 0.1) 50%,
     transparent 70%
   );
   animation: shine 6s infinite;
@@ -108,17 +115,18 @@
 .motivation-message:hover {
   transform: translateY(-2px);
   box-shadow: 
-    0 12px 35px rgba(102, 126, 234, 0.15),
-    0 3px 8px rgba(0, 0, 0, 0.05);
-  border-color: rgba(102, 126, 234, 0.3);
+    0 12px 40px rgba(0, 168, 255, 0.3),
+    0 0 60px rgba(0, 168, 255, 0.2),
+    inset 0 1px 0 rgba(0, 168, 255, 0.2);
+  border-color: rgba(0, 168, 255, 0.5);
 }
 
 .message-text {
   font-size: 1.25rem;
   line-height: 1.7;
   margin: 0;
-  font-weight: 600;
-  color: #2d3748;
+  font-weight: 500;
+  color: #e0e7ff;
   position: relative;
   z-index: 1;
   font-style: italic;
@@ -126,7 +134,7 @@
 
 .loading-spinner {
   font-size: 1.1rem;
-  color: #667eea;
+  color: #00a8ff;
   font-weight: 600;
   animation: pulse-loading 2s infinite;
 }
