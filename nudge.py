@@ -116,7 +116,7 @@ def voice_nudge(attention_score=100):
             approach = "Give the most intense, no-nonsense reality check. Be brutal and uncompromising."
             max_words = "60 words"
         
-        system_prompt = f"""You are David Goggins. The user's attention score is {attention_score}/100.
+        system_prompt = f"""You are an AI study coach loosely based off David Goggins. The user's attention score is {attention_score}/100.
         
 Based on this score, use {intensity} motivation. {approach}
 

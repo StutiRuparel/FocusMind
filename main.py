@@ -15,11 +15,18 @@ import random
 # Import the focus scoring system
 from FocusScore import generate_focus_chart_base64, generate_session_stats
 
+# Import the face tracking system
+from face_focus_tracker import FaceFocusTracker
+
 # Global attention score variable (shared state)
 attention_score = 100
 
 # Global focus score tracking for the current session
 focus_score_history = []
+
+# Global face tracking variables
+face_tracker = None
+tracking_active = False
 
 # Load environment variables from .env file
 load_dotenv()
@@ -172,7 +179,7 @@ async def get_voice_nudge():
     try:
         # Run nudge.py script with 'voice' argument and current attention score
         result = subprocess.run(
-            ["python3", "nudge.py", "voice", str(attention_score)], 
+            ["py", "nudge.py", "voice", str(attention_score)], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -213,7 +220,7 @@ async def generate_voice_audio(request: VoiceAudioRequest):
     try:
         # Use nudge.py to generate audio for the provided message
         result = subprocess.run(
-            ["python3", "nudge.py", "generate_audio", request.message], 
+            ["py", "nudge.py", "generate_audio", request.message], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -250,7 +257,7 @@ async def get_notification_nudge():
     try:
         # Run nudge.py script with 'notification' argument and current attention score
         result = subprocess.run(
-            ["python3", "nudge.py", "notification", str(attention_score)], 
+            ["py", "nudge.py", "notification", str(attention_score)], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -283,7 +290,7 @@ async def get_break_nudge():
     try:
         # Run nudge.py script with 'break' argument (no attention score needed for breaks)
         result = subprocess.run(
-            ["python3", "nudge.py", "break"], 
+            ["py", "nudge.py", "break"], 
             capture_output=True, 
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
@@ -319,6 +326,121 @@ async def get_break_nudge():
 async def get_nudge_quote():
     """Get a motivational quote with voiceover (backward compatibility - calls voice nudge)"""
     return await get_voice_nudge()
+
+# Face Tracking Integration Endpoints
+class FocusScoreUpdate(BaseModel):
+    focus_score: float
+
+class AutoMotivationTrigger(BaseModel):
+    threshold: int
+    focus_score: float
+
+@app.post("/update-focus-score")
+async def update_focus_score(request: FocusScoreUpdate):
+    """Update the attention score from face tracking system"""
+    global attention_score, focus_score_history
+    
+    # Update global attention score
+    attention_score = max(0, min(100, request.focus_score))
+    
+    # Add to focus score history for analytics
+    focus_score_history.append({
+        "timestamp": datetime.now(),
+        "score": attention_score
+    })
+    
+    # Keep only last 1000 entries to prevent memory issues
+    if len(focus_score_history) > 1000:
+        focus_score_history = focus_score_history[-1000:]
+    
+    return {
+        "success": True,
+        "updated_score": attention_score,
+        "message": "Focus score updated successfully"
+    }
+
+@app.post("/trigger-auto-motivation")
+async def trigger_auto_motivation(request: AutoMotivationTrigger):
+    """Trigger automatic motivational quote when focus drops below thresholds"""
+    global attention_score
+    
+    try:
+        print(f"🚨 Auto-motivation triggered! Focus dropped below {request.threshold}% (current: {request.focus_score:.1f}%)")
+        
+        # Run nudge.py script with 'voice' argument and current attention score
+        result = subprocess.run(
+            ["py", "nudge.py", "voice", str(int(request.focus_score))], 
+            capture_output=True, 
+            text=True, 
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if result.returncode == 0:
+            # Parse JSON output from nudge.py
+            output_data = json.loads(result.stdout.strip())
+            if output_data.get("success"):
+                audio_filename = output_data.get("audio_file")
+                audio_url = f"/audio/{audio_filename}" if audio_filename else None
+                
+                return {
+                    "success": True,
+                    "message": output_data["message"],
+                    "audio_url": audio_url,
+                    "audio_file": audio_filename,
+                    "source": output_data.get("source", "David Goggins AI"),
+                    "nudge_type": "auto_voice",
+                    "threshold": request.threshold,
+                    "focus_score": request.focus_score
+                }
+            else:
+                raise HTTPException(status_code=500, detail=f"Auto-motivation script error: {output_data.get('error', 'Unknown error')}")
+        else:
+            raise HTTPException(status_code=500, detail=f"Script execution failed: {result.stderr}")
+            
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse script output: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error running auto-motivation script: {str(e)}")
+
+@app.get("/face-tracking-status")
+async def get_face_tracking_status():
+    """Get the current status of face tracking."""
+    global face_tracker, tracking_active, focus_score_history
+    
+    if face_tracker is None:
+        return {
+            "active": False,
+            "score": None,
+            "last_update": None,
+            "message": "Face tracking not initialized"
+        }
+    
+    return {
+        "active": tracking_active,
+        "score": focus_score_history[-1]["score"] if focus_score_history else None,
+        "last_update": focus_score_history[-1]["timestamp"] if focus_score_history else None,
+        "message": "Face tracking active" if tracking_active else "Face tracking paused"
+    }
+
+@app.post("/start-face-tracking")
+async def start_face_tracking():
+    """Start the face tracking system (placeholder for future implementation)"""
+    # This could be enhanced to actually start the face tracking process
+    # For now, it's a placeholder that the frontend can call
+    return {
+        "success": True,
+        "message": "Face tracking start signal sent. Please run face_focus_tracker.py manually.",
+        "command": "python3 face_focus_tracker.py --source 0"
+    }
+
+@app.post("/stop-face-tracking")
+async def stop_face_tracking():
+    """Stop the face tracking system (placeholder for future implementation)"""
+    # This could be enhanced to actually stop the face tracking process
+    return {
+        "success": True,
+        "message": "Face tracking stop signal sent."
+    }
 
 if __name__ == "__main__":
     import uvicorn

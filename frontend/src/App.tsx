@@ -34,6 +34,19 @@ interface FocusChartResponse {
   error?: string;
 }
 
+interface FaceTrackingResponse {
+  success: boolean;
+  message: string;
+  command?: string;
+}
+
+interface FaceTrackingStatus {
+  attention_score: number;
+  focus_history_length: number;
+  last_update: string | null;
+  tracking_active: boolean;
+}
+
 function App() {
   const [motivationData, setMotivationData] = useState<MotivationData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,6 +65,10 @@ function App() {
   // Focus chart state
   const [showFocusChart, setShowFocusChart] = useState(false);
   const [focusChartData, setFocusChartData] = useState<FocusChartResponse | null>(null);
+  
+  // Face tracking state
+  const [faceTrackingActive, setFaceTrackingActive] = useState(false);
+  const [lastFaceTrackingUpdate, setLastFaceTrackingUpdate] = useState<string | null>(null);
   
   // Global audio management to prevent multiple audio tracks playing simultaneously
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -564,6 +581,57 @@ function App() {
     sessionIncrementedRef.current = false; // Reset session increment flag
   };
 
+  // Face Tracking Functions
+  const startFaceTracking = async () => {
+    try {
+      console.log('📹 Starting face tracking...');
+      const response = await axios.post<FaceTrackingResponse>('http://localhost:8000/start-face-tracking');
+      
+      if (response.data.success) {
+        setFaceTrackingActive(true);
+        console.log('✅ Face tracking started successfully');
+        console.log('💡 Command to run manually:', response.data.command);
+        
+        // Show notification to user about manual command
+        alert(`Face tracking enabled! Please run this command in a new terminal:\n\n${response.data.command}`);
+      }
+    } catch (error) {
+      console.error('❌ Error starting face tracking:', error);
+      alert('Failed to start face tracking. Make sure the backend is running.');
+    }
+  };
+
+  const stopFaceTracking = async () => {
+    try {
+      console.log('📹 Stopping face tracking...');
+      const response = await axios.post<FaceTrackingResponse>('http://localhost:8000/stop-face-tracking');
+      
+      if (response.data.success) {
+        setFaceTrackingActive(false);
+        console.log('✅ Face tracking stopped successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error stopping face tracking:', error);
+    }
+  };
+
+  const checkFaceTrackingStatus = async () => {
+    try {
+      const response = await axios.get<FaceTrackingStatus>('http://localhost:8000/face-tracking-status');
+      setLastFaceTrackingUpdate(response.data.last_update);
+      
+      // Update attention score from face tracking if available
+      if (response.data.attention_score !== undefined && motivationData) {
+        setMotivationData({
+          ...motivationData,
+          attention_score: response.data.attention_score
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error checking face tracking status:', error);
+    }
+  };
+
   // Pomodoro Timer Effect
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -626,6 +694,33 @@ function App() {
     };
   }, [currentAudio]);
 
+  // Face tracking status monitoring
+  useEffect(() => {
+    let statusInterval: NodeJS.Timeout | null = null;
+    
+    if (faceTrackingActive || pomodoroRunning) {
+      // Check face tracking status every 3 seconds when active or during Pomodoro
+      statusInterval = setInterval(() => {
+        checkFaceTrackingStatus();
+      }, 3000);
+    }
+    
+    return () => {
+      if (statusInterval) clearInterval(statusInterval);
+    };
+  }, [faceTrackingActive, pomodoroRunning]);
+
+  // Auto-start face tracking when Pomodoro begins
+  useEffect(() => {
+    if (pomodoroRunning && !faceTrackingActive) {
+      console.log('🍅 Pomodoro started - enabling automatic face tracking');
+      startFaceTracking();
+    } else if (!pomodoroRunning && faceTrackingActive) {
+      console.log('⏸️ Pomodoro stopped - disabling face tracking');
+      stopFaceTracking();
+    }
+  }, [pomodoroRunning]);
+
   return (
     <div className="App">
       <Header 
@@ -671,6 +766,24 @@ function App() {
         }}>
           Session #{pomodoroSessions + 1} • 
           {pomodoroRunning ? ' ⏰ Running' : ' ⏸️ Paused'}
+        </div>
+        
+        {/* Face Tracking Status */}
+        <div style={{
+          fontSize: '0.8rem',
+          padding: '0.5rem 1rem',
+          borderRadius: '20px',
+          margin: '0.5rem 0 1rem 0',
+          background: faceTrackingActive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(156, 163, 175, 0.1)',
+          color: faceTrackingActive ? '#059669' : '#6b7280',
+          border: faceTrackingActive ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(156, 163, 175, 0.3)'
+        }}>
+          📹 Face Tracking: {faceTrackingActive ? 'Active' : 'Inactive'}
+          {lastFaceTrackingUpdate && faceTrackingActive && (
+            <div style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>
+              Last update: {new Date(lastFaceTrackingUpdate).toLocaleTimeString()}
+            </div>
+          )}
         </div>
         
         <div style={{
