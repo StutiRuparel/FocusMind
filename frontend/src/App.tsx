@@ -721,48 +721,22 @@ function App() {
     }
   }, [pomodoroRunning]);
 
-  return (
-    <div className="App">
-      <Header 
-        message={motivationData?.message || "Welcome to FocusMind! Click 'Get Voice Nudge' to hear David Goggins motivation."} 
-        loading={loading}
-      />
-      <Dashboard 
-        attentionScore={motivationData?.attention_score || 0}
-        onDecreaseAttention={decreaseAttention}
-        onGetVoiceNudge={readCurrentMessage}
-        onGetNotificationNudge={getNotificationNudge}
-        loading={loading}
-        nudgeExecuted={nudgeExecuted}
-        notificationSent={notificationSent}
-        notificationPermission={notificationPermission}
-        onRequestNotificationPermission={() => {
-          if ('Notification' in window) {
-            Notification.requestPermission().then((permission) => {
-              setNotificationPermission(permission);
-            });
-          }
-        }}
-      />
-      
-      {/* FUNCTIONAL Pomodoro Timer */}
-      <div style={{ 
-        margin: '2rem auto', 
-        padding: '3rem', 
+  // Pomodoro Timer JSX
+  const pomodoroTimerJSX = (
+    <div style={{ 
+        padding: '2rem', 
         background: 'rgba(13, 27, 42, 0.7)',
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-        borderRadius: '24px',
-        maxWidth: '500px',
+        borderRadius: '20px',
         textAlign: 'center',
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 168, 255, 0.2), inset 0 1px 0 rgba(0, 168, 255, 0.1)',
         border: '1px solid rgba(0, 168, 255, 0.2)',
-        position: 'relative',
-        zIndex: 1
+        position: 'relative'
       }}>
         <h2 style={{ 
-          margin: '0 0 1.5rem 0', 
-          fontSize: '2rem',
+          margin: '0 0 1rem 0', 
+          fontSize: '1.75rem',
           fontWeight: '800',
           color: '#ffffff',
           letterSpacing: '-0.02em',
@@ -772,9 +746,9 @@ function App() {
         </h2>
         
         <div style={{ 
-          fontSize: '0.9rem', 
+          fontSize: '0.875rem', 
           color: '#7dd3fc',
-          marginBottom: '1rem',
+          marginBottom: '0.75rem',
           fontWeight: '500'
         }}>
           Session #{pomodoroSessions + 1} • 
@@ -783,10 +757,10 @@ function App() {
         
         {/* Face Tracking Status */}
         <div style={{
-          fontSize: '0.8rem',
-          padding: '0.5rem 1rem',
-          borderRadius: '20px',
-          margin: '0.5rem 0 1rem 0',
+          fontSize: '0.75rem',
+          padding: '0.4rem 0.875rem',
+          borderRadius: '16px',
+          margin: '0 0 0.75rem 0',
           background: faceTrackingActive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(156, 163, 175, 0.1)',
           color: faceTrackingActive ? '#059669' : '#6b7280',
           border: faceTrackingActive ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(156, 163, 175, 0.3)'
@@ -800,10 +774,10 @@ function App() {
         </div>
         
         <div style={{
-          fontSize: '3.5rem',
+          fontSize: '3rem',
           fontWeight: '800',
           color: pomodoroTime <= 60 ? '#ef4444' : '#00d4ff',
-          margin: '2rem 0',
+          margin: '1.5rem 0',
           fontFamily: '"SF Mono", Monaco, monospace',
           letterSpacing: '0.05em',
           textShadow: pomodoroTime <= 60 
@@ -896,18 +870,18 @@ function App() {
         </div>
 
         <div style={{ 
-          marginTop: '2rem', 
-          fontSize: '0.875rem', 
+          marginTop: '1.5rem', 
+          fontSize: '0.8rem', 
           color: '#7dd3fc',
-          padding: '1.25rem 1.5rem',
+          padding: '1rem 1.25rem',
           background: 'rgba(0, 168, 255, 0.1)',
           borderRadius: '12px',
           border: '1px solid rgba(0, 168, 255, 0.2)',
           textAlign: 'left',
-          lineHeight: '1.8',
+          lineHeight: '1.6',
           boxShadow: 'inset 0 0 20px rgba(0, 168, 255, 0.1)'
         }}>
-          <div style={{ fontWeight: '600', marginBottom: '0.75rem', color: '#ffffff' }}>📋 How it works:</div>
+          <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#ffffff' }}>📋 How it works:</div>
           • Click Start for 25-minute focus session<br/>
           • Timer turns red in final minute<br/>
           • Auto break nudge when timer reaches 0<br/>
@@ -918,14 +892,14 @@ function App() {
         
         {pomodoroTime === 0 && (
           <div style={{
-            marginTop: '1.5rem',
-            padding: '1.25rem 1.5rem',
+            marginTop: '1rem',
+            padding: '1rem 1.25rem',
             background: 'rgba(16, 185, 129, 0.15)',
             color: '#34d399',
             borderRadius: '12px',
             border: '1px solid rgba(16, 185, 129, 0.4)',
             fontWeight: '600',
-            fontSize: '1rem',
+            fontSize: '0.95rem',
             boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16, 185, 129, 0.1)',
             animation: 'pulse 2s infinite'
           }}>
@@ -933,6 +907,32 @@ function App() {
           </div>
         )}
       </div>
+  );
+
+  return (
+    <div className="App">
+      <Header 
+        message={motivationData?.message || "Welcome to FocusMind! Click 'Get Voice Nudge' to hear David Goggins motivation."} 
+        loading={loading}
+      />
+      <Dashboard 
+        attentionScore={motivationData?.attention_score || 0}
+        onDecreaseAttention={decreaseAttention}
+        onGetVoiceNudge={readCurrentMessage}
+        onGetNotificationNudge={getNotificationNudge}
+        loading={loading}
+        nudgeExecuted={nudgeExecuted}
+        notificationSent={notificationSent}
+        notificationPermission={notificationPermission}
+        onRequestNotificationPermission={() => {
+          if ('Notification' in window) {
+            Notification.requestPermission().then((permission) => {
+              setNotificationPermission(permission);
+            });
+          }
+        }}
+        pomodoroTimer={pomodoroTimerJSX}
+      />
       
       {/* Focus Chart Modal */}
       {showFocusChart && focusChartData && (
