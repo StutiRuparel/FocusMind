@@ -1,6 +1,6 @@
 # FocusMind - AI-Powered Productivity & Study Coach
 
-A comprehensive web application that combines the **Pomodoro Technique** with **David Goggins-style AI motivation**, **real-time focus tracking**, and **performance analytics** to maximize your productivity and study effectiveness.
+A comprehensive web application that combines the **Pomodoro Technique** with **Health & Focus Boost Advices**, **David Goggins-style AI motivation**, **real-time focus tracking**, and **performance analytics** to maximize your productivity and study effectiveness.
 
 ![FocusMind Banner](https://img.shields.io/badge/FocusMind-AI%20Study%20Coach-blue?style=for-the-badge&logo=brain&logoColor=white)
 
@@ -26,7 +26,7 @@ A comprehensive web application that combines the **Pomodoro Technique** with **
 - **Focus Chart**: Visual analytics showing attention patterns over time
 
 ### 🎤 **Advanced Audio System**
-- **Voice Coaching**: David Goggins-style motivation read aloud automatically
+- **Voice Coaching**: David Goggins-style motivation and Health & Focus Boost Advices read aloud automatically
 - **Audio Management**: Smart system prevents overlapping audio tracks
 - **Manual Voice Reading**: Click to hear any displayed quote read aloud
 - **High-Quality TTS**: OpenAI "onyx" voice for authoritative coaching
