@@ -32,6 +32,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 # -------------------------------------------------
 WORKDIR /app
 
+# ---- make sure the empty audio folder exists for FastAPI ----
+RUN mkdir -p audio_files
+
 # -------------------------------------------------
 # 5️⃣ Python dependencies
 # -------------------------------------------------
@@ -70,4 +73,5 @@ EXPOSE 8080
 # 🔟 Runtime – use the script to launch uvicorn
 # -------------------------------------------------
 CMD ["/usr/local/bin/start.sh"]
+
 
