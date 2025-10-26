@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # -------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest   # optional – newest npm
+    && npm install -g npm@latest   
 
 # -------------------------------------------------
 # 4️⃣ Working directory
@@ -48,7 +48,7 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build    # creates ./build with static assets
+RUN npm run build    
 
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
@@ -64,9 +64,10 @@ RUN chmod +x /usr/local/bin/start.sh
 # -------------------------------------------------
 # 🔟 Expose a placeholder port (Render will rewrite $PORT)
 # -------------------------------------------------
-EXPOSE 8080   # any non‑privileged number; Render injects the real $PORT
+EXPOSE 8080  
 
 # -------------------------------------------------
 # 🔟 Runtime – use the script to launch uvicorn
 # -------------------------------------------------
 CMD ["/usr/local/bin/start.sh"]
+
