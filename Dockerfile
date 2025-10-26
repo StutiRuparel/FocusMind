@@ -73,5 +73,3 @@ EXPOSE 8080
 # 🔟 Runtime – use the script to launch uvicorn
 # -------------------------------------------------
 CMD ["/usr/local/bin/start.sh"]
-
-
