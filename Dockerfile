@@ -64,7 +64,7 @@ RUN chmod +x /usr/local/bin/start.sh
 # -------------------------------------------------
 # 🔟 Expose a placeholder port (Render will rewrite $PORT)
 # -------------------------------------------------
-EXPOSE 8080   # any non‑privileged number; Render will replace it with $PORT
+EXPOSE 8080   # any non‑privileged number; Render injects the real $PORT
 
 # -------------------------------------------------
 # 🔟 Runtime – use the script to launch uvicorn
