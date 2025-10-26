@@ -3,18 +3,17 @@
 # -------------------------------------------------
 FROM python:3.11-slim
 
-
 # -------------------------------------------------
 # 2️⃣ System dependencies – only what OpenCV needs
 # -------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
-        gnupg \                # <-- correct package name for the slim image
+        gnupg \
         build-essential \
         git \
-        libgl1 \               # <-- replaces libgl1-mesa-glx
+        libgl1 \
         libglib2.0-0 \
-        ca-certificates \      # ensures HTTPS works for curl / Node installer
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
@@ -22,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # -------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest  
+    && npm install -g npm@latest
 
 # -------------------------------------------------
 # 4️⃣ Working directory
@@ -45,7 +44,7 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build           
+RUN npm run build
 
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
@@ -55,10 +54,9 @@ WORKDIR /app
 # -------------------------------------------------
 # 9️⃣ Expose a placeholder port (Render will replace $PORT)
 # -------------------------------------------------
-EXPOSE 8080  
+EXPOSE 8080
 
 # -------------------------------------------------
 # 🔟 Runtime – start FastAPI with uvicorn on $PORT
 # -------------------------------------------------
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
-
