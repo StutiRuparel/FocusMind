@@ -37,8 +37,21 @@ app = FastAPI(title="FocusMind API", description="Motivational Study Coach API")
 audio_dir = Path("audio_files")
 audio_dir.mkdir(exist_ok=True)
 
-# Mount static files for audio serving
+# ------------------------------
+# 1️⃣  Audio files (already present)
+# ------------------------------
 app.mount("/audio", StaticFiles(directory="audio_files"), name="audio")
+
+# ------------------------------
+# 2️⃣  React front‑end (new)
+# ------------------------------
+# `html=True` tells FastAPI to serve `index.html` for any unknown path,
+# which is exactly what you want for a single‑page app.
+app.mount(
+    "/",                                 # root URL
+    StaticFiles(directory="frontend/build", html=True),
+    name="frontend"
+)
 
 # Add CORS middleware to allow React frontend to connect
 app.add_middleware(
