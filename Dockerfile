@@ -1,5 +1,5 @@
 # -------------------------------------------------
-# Base image – pick the exact Python version you need.
+# Base image – pick the Python version you need.
 # Change 3.11‑slim to 3.10‑slim, 3.12‑slim, etc. if required.
 # -------------------------------------------------
 FROM python:3.11-slim
@@ -49,9 +49,10 @@ RUN npm install
 WORKDIR /app
 
 # -------------------------------------------------
-# Expose a placeholder port (Render will inject $PORT at runtime)
+# Expose a placeholder port.
+# Render will replace this with the value of $PORT at runtime.
 # -------------------------------------------------
-EXPOSE 8080   # any numeric value works; Render rewrites it to $PORT
+EXPOSE 8080   # any numeric value works; the comment is on a separate line
 
 # -------------------------------------------------
 # Runtime: launch backend and frontend together
