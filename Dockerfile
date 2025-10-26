@@ -11,9 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gnupg \
         build-essential \
         git \
-        libgl1 \
+        libgl1 \            # runtime OpenGL library for opencv‑python
         libglib2.0-0 \
-        ca-certificates \
+        ca-certificates \   # needed for HTTPS (curl / node installer)
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
@@ -21,7 +21,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # -------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest
+    && npm install -g npm@latest   # optional – newest npm
 
 # -------------------------------------------------
 # 4️⃣ Working directory
@@ -35,7 +35,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -------------------------------------------------
-# 6️⃣ Copy the whole source tree
+# 6️⃣ Copy the whole source tree (including start.sh)
 # -------------------------------------------------
 COPY . .
 
@@ -44,19 +44,24 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build          
-
+RUN npm run build           
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
 # -------------------------------------------------
 WORKDIR /app
 
 # -------------------------------------------------
-# 9️⃣ Expose a placeholder port (Render will rewrite $PORT)
+# 9️⃣ Make the startup script executable
+# -------------------------------------------------
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# -------------------------------------------------
+# 🔟 Expose a placeholder port (Render will rewrite $PORT)
 # -------------------------------------------------
 EXPOSE 8080   
 
 # -------------------------------------------------
-# 🔟 Runtime – start FastAPI with uvicorn on $PORT
+# 🔟 Runtime – use the script to launch uvicorn
 # -------------------------------------------------
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
+CMD ["/usr/local/bin/start.sh"]
