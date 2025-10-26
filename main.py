@@ -39,9 +39,10 @@ app = FastAPI(
 audio_dir = Path("audio_files")
 audio_dir.mkdir(exist_ok=True)
 
-# --------------------------- Static mounts -----------------------------
-# 1️⃣  Audio files (already present)
-#app.mount("/audio", StaticFiles(directory="audio_files"), name="audio")
+# -------------------------------------------------
+# Audio static mount – keep first (doesn’t interfere)
+# -------------------------------------------------
+app.mount("/audio", StaticFiles(directory="audio_files"), name="audio")
 
 # 2️⃣  React front‑end (served at root)
 # `html=True` makes FastAPI fall back to `index.html` for any unknown path –
