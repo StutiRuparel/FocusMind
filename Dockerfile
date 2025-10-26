@@ -1,5 +1,5 @@
 # -------------------------------------------------
-# 1️⃣ Base image – Python 3.11 (slim)
+# 1️⃣ Base image – Python 3.11 (slim, Debian bookworm)
 # -------------------------------------------------
 FROM python:3.11-slim
 
@@ -44,7 +44,7 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build
+RUN npm run build          
 
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
@@ -52,11 +52,11 @@ RUN npm run build
 WORKDIR /app
 
 # -------------------------------------------------
-# 9️⃣ Expose a placeholder port (Render will replace $PORT)
+# 9️⃣ Expose a placeholder port (Render will rewrite $PORT)
 # -------------------------------------------------
-EXPOSE 8080
+EXPOSE 8080   
 
 # -------------------------------------------------
 # 🔟 Runtime – start FastAPI with uvicorn on $PORT
 # -------------------------------------------------
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
