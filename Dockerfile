@@ -52,7 +52,7 @@ WORKDIR /app
 # Expose a placeholder port.
 # Render will replace this with the value of $PORT at runtime.
 # -------------------------------------------------
-EXPOSE 8080   # any numeric value works; the comment is on a separate line
+EXPOSE 8080
 
 # -------------------------------------------------
 # Runtime: launch backend and frontend together
@@ -64,3 +64,4 @@ CMD ["sh", "-c", "\
     cd frontend && npm start & \
     wait\
 "]
+
