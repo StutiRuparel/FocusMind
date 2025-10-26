@@ -3,17 +3,18 @@
 # -------------------------------------------------
 FROM python:3.11-slim
 
+
 # -------------------------------------------------
 # 2️⃣ System dependencies – only what OpenCV needs
 # -------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
-        gnupg \               
+        gnupg \                # <-- correct package name for the slim image
         build-essential \
         git \
-        libgl1-mesa-glx \
+        libgl1 \               # <-- replaces libgl1-mesa-glx
         libglib2.0-0 \
-        ca-certificates \    
+        ca-certificates \      # ensures HTTPS works for curl / Node installer
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
@@ -60,3 +61,4 @@ EXPOSE 8080
 # 🔟 Runtime – start FastAPI with uvicorn on $PORT
 # -------------------------------------------------
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+
