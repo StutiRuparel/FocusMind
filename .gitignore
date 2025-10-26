@@ -4,6 +4,7 @@
 # Virtual environment
 venv/
 env/
+focusmind_env/
 
 # Node modules
 frontend/node_modules/

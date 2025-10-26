@@ -15,7 +15,7 @@ const Header: React.FC<HeaderProps> = ({ message, loading }) => {
           {loading ? (
             <div className="loading-spinner">Loading...</div>
           ) : (
-            <p className="message-text">{message}</p>
+            <p className="message-text">"{message}"</p>
           )}
         </div>
       </div>

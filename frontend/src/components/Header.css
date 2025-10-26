@@ -1,9 +1,42 @@
 .header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 2rem 1rem;
+  background: rgba(10, 22, 40, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: #ffffff;
+  padding: 1.5rem 1.5rem;
   text-align: center;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(0, 168, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 168, 255, 0.2);
+  position: relative;
+  z-index: 10;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    #00a8ff 20%, 
+    #00d4ff 50%, 
+    #00a8ff 80%, 
+    transparent 100%);
+  animation: header-glow 3s ease-in-out infinite;
+}
+
+@keyframes header-glow {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.5);
+  }
 }
 
 .header-content {
@@ -12,39 +45,119 @@
 }
 
 .app-title {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: 2.25rem;
+  font-weight: 800;
   margin: 0 0 1rem 0;
   letter-spacing: -0.02em;
+  color: #ffffff;
+  text-shadow: 
+    0 0 20px rgba(0, 168, 255, 0.5),
+    0 0 40px rgba(0, 168, 255, 0.3),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+  animation: title-glow 4s ease-in-out infinite;
+}
+
+@keyframes title-glow {
+  0%, 100% {
+    text-shadow: 
+      0 0 20px rgba(0, 168, 255, 0.5),
+      0 0 40px rgba(0, 168, 255, 0.3),
+      0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+  50% {
+    text-shadow: 
+      0 0 30px rgba(0, 168, 255, 0.8),
+      0 0 60px rgba(0, 168, 255, 0.5),
+      0 2px 4px rgba(0, 0, 0, 0.5);
+  }
 }
 
 .motivation-message {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(13, 27, 42, 0.7);
   backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 1.5rem;
+  border-radius: 16px;
+  padding: 1.25rem 1.75rem;
   margin-top: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1.5px solid rgba(0, 168, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(0, 168, 255, 0.1);
+}
+
+.motivation-message::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(0, 168, 255, 0.1) 50%,
+    transparent 70%
+  );
+  animation: shine 6s infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+.motivation-message:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 12px 40px rgba(0, 168, 255, 0.3),
+    0 0 60px rgba(0, 168, 255, 0.2),
+    inset 0 1px 0 rgba(0, 168, 255, 0.2);
+  border-color: rgba(0, 168, 255, 0.5);
 }
 
 .message-text {
   font-size: 1.1rem;
-  line-height: 1.6;
+  line-height: 1.5;
   margin: 0;
   font-weight: 500;
+  color: #e0e7ff;
+  position: relative;
+  z-index: 1;
+  font-style: italic;
 }
 
 .loading-spinner {
   font-size: 1.1rem;
-  opacity: 0.8;
-  animation: pulse 2s infinite;
+  color: #00a8ff;
+  font-weight: 600;
+  animation: pulse-loading 2s infinite;
 }
 
-@keyframes pulse {
+@keyframes pulse-loading {
   0%, 100% {
-    opacity: 0.8;
+    opacity: 1;
   }
   50% {
-    opacity: 0.4;
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-title {
+    font-size: 2.5rem;
+  }
+  
+  .motivation-message {
+    padding: 1.5rem 1.5rem;
+  }
+  
+  .message-text {
+    font-size: 1.1rem;
   }
 }

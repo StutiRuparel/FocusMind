@@ -34,6 +34,19 @@ interface FocusChartResponse {
   error?: string;
 }
 
+interface FaceTrackingResponse {
+  success: boolean;
+  message: string;
+  command?: string;
+}
+
+interface FaceTrackingStatus {
+  attention_score: number;
+  focus_history_length: number;
+  last_update: string | null;
+  tracking_active: boolean;
+}
+
 function App() {
   const [motivationData, setMotivationData] = useState<MotivationData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,6 +65,10 @@ function App() {
   // Focus chart state
   const [showFocusChart, setShowFocusChart] = useState(false);
   const [focusChartData, setFocusChartData] = useState<FocusChartResponse | null>(null);
+  
+  // Face tracking state
+  const [faceTrackingActive, setFaceTrackingActive] = useState(false);
+  const [lastFaceTrackingUpdate, setLastFaceTrackingUpdate] = useState<string | null>(null);
   
   // Global audio management to prevent multiple audio tracks playing simultaneously
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
@@ -564,6 +581,57 @@ function App() {
     sessionIncrementedRef.current = false; // Reset session increment flag
   };
 
+  // Face Tracking Functions
+  const startFaceTracking = async () => {
+    try {
+      console.log('📹 Starting face tracking...');
+      const response = await axios.post<FaceTrackingResponse>('http://localhost:8000/start-face-tracking');
+      
+      if (response.data.success) {
+        setFaceTrackingActive(true);
+        console.log('✅ Face tracking started successfully');
+        console.log('💡 Command to run manually:', response.data.command);
+        
+        // Show notification to user about manual command
+        alert(`Face tracking enabled! Please run this command in a new terminal:\n\n${response.data.command}`);
+      }
+    } catch (error) {
+      console.error('❌ Error starting face tracking:', error);
+      alert('Failed to start face tracking. Make sure the backend is running.');
+    }
+  };
+
+  const stopFaceTracking = async () => {
+    try {
+      console.log('📹 Stopping face tracking...');
+      const response = await axios.post<FaceTrackingResponse>('http://localhost:8000/stop-face-tracking');
+      
+      if (response.data.success) {
+        setFaceTrackingActive(false);
+        console.log('✅ Face tracking stopped successfully');
+      }
+    } catch (error) {
+      console.error('❌ Error stopping face tracking:', error);
+    }
+  };
+
+  const checkFaceTrackingStatus = async () => {
+    try {
+      const response = await axios.get<FaceTrackingStatus>('http://localhost:8000/face-tracking-status');
+      setLastFaceTrackingUpdate(response.data.last_update);
+      
+      // Update attention score from face tracking if available
+      if (response.data.attention_score !== undefined && motivationData) {
+        setMotivationData({
+          ...motivationData,
+          attention_score: response.data.attention_score
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error checking face tracking status:', error);
+    }
+  };
+
   // Pomodoro Timer Effect
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -626,6 +694,221 @@ function App() {
     };
   }, [currentAudio]);
 
+  // Face tracking status monitoring
+  useEffect(() => {
+    let statusInterval: NodeJS.Timeout | null = null;
+    
+    if (faceTrackingActive || pomodoroRunning) {
+      // Check face tracking status every 3 seconds when active or during Pomodoro
+      statusInterval = setInterval(() => {
+        checkFaceTrackingStatus();
+      }, 3000);
+    }
+    
+    return () => {
+      if (statusInterval) clearInterval(statusInterval);
+    };
+  }, [faceTrackingActive, pomodoroRunning]);
+
+  // Auto-start face tracking when Pomodoro begins
+  useEffect(() => {
+    if (pomodoroRunning && !faceTrackingActive) {
+      console.log('🍅 Pomodoro started - enabling automatic face tracking');
+      startFaceTracking();
+    } else if (!pomodoroRunning && faceTrackingActive) {
+      console.log('⏸️ Pomodoro stopped - disabling face tracking');
+      stopFaceTracking();
+    }
+  }, [pomodoroRunning]);
+
+  // Pomodoro Timer JSX
+  const pomodoroTimerJSX = (
+    <div style={{ 
+        padding: '2rem', 
+        background: 'rgba(13, 27, 42, 0.7)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        borderRadius: '20px',
+        textAlign: 'center',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 168, 255, 0.2), inset 0 1px 0 rgba(0, 168, 255, 0.1)',
+        border: '1px solid rgba(0, 168, 255, 0.2)',
+        position: 'relative'
+      }}>
+        <h2 style={{ 
+          margin: '0 0 1rem 0', 
+          fontSize: '1.75rem',
+          fontWeight: '800',
+          color: '#ffffff',
+          letterSpacing: '-0.02em',
+          textShadow: '0 0 20px rgba(0, 168, 255, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5)'
+        }}>
+          🍅 Pomodoro Timer
+        </h2>
+        
+        <div style={{ 
+          fontSize: '0.875rem', 
+          color: '#7dd3fc',
+          marginBottom: '0.75rem',
+          fontWeight: '500'
+        }}>
+          Session #{pomodoroSessions + 1} • 
+          {pomodoroRunning ? ' ⏰ Running' : ' ⏸️ Paused'}
+        </div>
+        
+        {/* Face Tracking Status */}
+        <div style={{
+          fontSize: '0.75rem',
+          padding: '0.4rem 0.875rem',
+          borderRadius: '16px',
+          margin: '0 0 0.75rem 0',
+          background: faceTrackingActive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(156, 163, 175, 0.1)',
+          color: faceTrackingActive ? '#059669' : '#6b7280',
+          border: faceTrackingActive ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(156, 163, 175, 0.3)'
+        }}>
+          📹 Face Tracking: {faceTrackingActive ? 'Active' : 'Inactive'}
+          {lastFaceTrackingUpdate && faceTrackingActive && (
+            <div style={{ fontSize: '0.7rem', marginTop: '0.25rem' }}>
+              Last update: {new Date(lastFaceTrackingUpdate).toLocaleTimeString()}
+            </div>
+          )}
+        </div>
+        
+        <div style={{
+          fontSize: '3rem',
+          fontWeight: '800',
+          color: pomodoroTime <= 60 ? '#ef4444' : '#00d4ff',
+          margin: '1.5rem 0',
+          fontFamily: '"SF Mono", Monaco, monospace',
+          letterSpacing: '0.05em',
+          textShadow: pomodoroTime <= 60 
+            ? '0 0 30px rgba(239, 68, 68, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5)' 
+            : '0 0 30px rgba(0, 212, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.5)'
+        }}>
+          {formatTime(pomodoroTime)}
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {!pomodoroRunning ? (
+            <button 
+              onClick={startPomodoro}
+              style={{
+                padding: '0.875rem 1.75rem',
+                background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                color: 'white',
+                border: '1px solid rgba(2, 132, 199, 0.5)',
+                borderRadius: '12px',
+                fontWeight: '600',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(2, 132, 199, 0.4), 0 0 40px rgba(2, 132, 199, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(2, 132, 199, 0.6), 0 0 60px rgba(2, 132, 199, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(2, 132, 199, 0.4), 0 0 40px rgba(2, 132, 199, 0.2)';
+              }}
+            >
+              ▶️ Start
+            </button>
+          ) : (
+            <button 
+              onClick={pausePomodoro}
+              style={{
+                padding: '0.875rem 1.75rem',
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                color: 'white',
+                border: '1px solid rgba(245, 158, 11, 0.5)',
+                borderRadius: '12px',
+                fontWeight: '600',
+                fontSize: '1rem',
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 12px 32px rgba(245, 158, 11, 0.6), 0 0 60px rgba(245, 158, 11, 0.4)';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)';
+              }}
+            >
+              ⏸️ Pause
+            </button>
+          )}
+          
+          <button 
+            onClick={resetPomodoro}
+            style={{
+              padding: '0.875rem 1.75rem',
+              background: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+              color: 'white',
+              border: '1px solid rgba(71, 85, 105, 0.5)',
+              borderRadius: '12px',
+              fontWeight: '600',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              boxShadow: '0 8px 24px rgba(71, 85, 105, 0.4), 0 0 40px rgba(71, 85, 105, 0.2)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 12px 32px rgba(71, 85, 105, 0.6), 0 0 60px rgba(71, 85, 105, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 8px 24px rgba(71, 85, 105, 0.4), 0 0 40px rgba(71, 85, 105, 0.2)';
+            }}
+          >
+            🔄 Reset
+          </button>
+        </div>
+
+        <div style={{ 
+          marginTop: '1.5rem', 
+          fontSize: '0.8rem', 
+          color: '#7dd3fc',
+          padding: '1rem 1.25rem',
+          background: 'rgba(0, 168, 255, 0.1)',
+          borderRadius: '12px',
+          border: '1px solid rgba(0, 168, 255, 0.2)',
+          textAlign: 'left',
+          lineHeight: '1.6',
+          boxShadow: 'inset 0 0 20px rgba(0, 168, 255, 0.1)'
+        }}>
+          <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#ffffff' }}>📋 How it works:</div>
+          • Click Start for 25-minute focus session<br/>
+          • Timer turns red in final minute<br/>
+          • Auto break nudge when timer reaches 0<br/>
+          • David Goggins tells you to stretch & hydrate!<br/>
+          • After break → See your focus performance chart!<br/>
+          • {isBreakTime ? '🛌 BREAK MODE: No other nudges will interrupt' : '💪 FOCUS MODE: Ready for motivation'}
+        </div>
+        
+        {pomodoroTime === 0 && (
+          <div style={{
+            marginTop: '1rem',
+            padding: '1rem 1.25rem',
+            background: 'rgba(16, 185, 129, 0.15)',
+            color: '#34d399',
+            borderRadius: '12px',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            fontWeight: '600',
+            fontSize: '0.95rem',
+            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3), inset 0 0 20px rgba(16, 185, 129, 0.1)',
+            animation: 'pulse 2s infinite'
+          }}>
+            🎉 Session Complete! Time for a break!
+          </div>
+        )}
+      </div>
+  );
+
   return (
     <div className="App">
       <Header 
@@ -648,121 +931,8 @@ function App() {
             });
           }
         }}
+        pomodoroTimer={pomodoroTimerJSX}
       />
-      
-      {/* FUNCTIONAL Pomodoro Timer */}
-      <div style={{ 
-        margin: '2rem auto', 
-        padding: '2rem', 
-        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-        borderRadius: '16px',
-        maxWidth: '400px',
-        textAlign: 'center',
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
-      }}>
-        <h2 style={{ margin: '0 0 1rem 0', color: '#1f2937' }}>
-          🍅 Pomodoro Timer
-        </h2>
-        
-        <div style={{ 
-          fontSize: '0.9rem', 
-          color: '#6b7280',
-          marginBottom: '1rem'
-        }}>
-          Session #{pomodoroSessions + 1} • 
-          {pomodoroRunning ? ' ⏰ Running' : ' ⏸️ Paused'}
-        </div>
-        
-        <div style={{
-          fontSize: '3rem',
-          fontWeight: 'bold',
-          color: pomodoroTime <= 60 ? '#ef4444' : '#1f2937',
-          margin: '2rem 0',
-          fontFamily: 'monospace'
-        }}>
-          {formatTime(pomodoroTime)}
-        </div>
-
-        <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          {!pomodoroRunning ? (
-            <button 
-              onClick={startPomodoro}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              ▶️ Start
-            </button>
-          ) : (
-            <button 
-              onClick={pausePomodoro}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '12px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
-              ⏸️ Pause
-            </button>
-          )}
-          
-          <button 
-            onClick={resetPomodoro}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '12px',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
-          >
-            🔄 Reset
-          </button>
-        </div>
-
-        <div style={{ 
-          marginTop: '1.5rem', 
-          fontSize: '0.85rem', 
-          color: '#6b7280',
-          padding: '1rem',
-          background: '#f3f4f6',
-          borderRadius: '8px'
-        }}>
-          📋 <strong>How it works:</strong><br/>
-          • Click Start for 25-minute focus session<br/>
-          • Timer turns red in final minute<br/>
-          • Auto break nudge when timer reaches 0<br/>
-          • David Goggins tells you to stretch & hydrate!<br/>
-          • After break → See your focus performance chart!<br/>
-          • {isBreakTime ? '🛌 BREAK MODE: No other nudges will interrupt' : '💪 FOCUS MODE: Ready for motivation'}
-        </div>
-        
-        {pomodoroTime === 0 && (
-          <div style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            background: '#f0fdf4',
-            color: '#16a34a',
-            borderRadius: '8px',
-            fontWeight: '600',
-            animation: 'pulse 2s infinite'
-          }}>
-            🎉 Session Complete! Time for a break!
-          </div>
-        )}
-      </div>
       
       {/* Focus Chart Modal */}
       {showFocusChart && focusChartData && (
