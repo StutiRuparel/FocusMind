@@ -1,20 +1,22 @@
 # -------------------------------------------------
-# 1️⃣ Base image – Python 3.11 (change if you need another)
+# 1️⃣ Base image – Python 3.11 (slim)
 # -------------------------------------------------
 FROM python:3.11-slim
 
 # -------------------------------------------------
-# 2️⃣ System dependencies (OpenCV GL libs + Node)
+# 2️⃣ System deps – only the runtime libs needed by OpenCV
 # -------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl gnupg build-essential git \
-        libgl1-mesa-glx libglib2.0-0 \
-        # optional but useful for other CV wheels
-        libglib2.0-dev libsm6 libxext6 libxrender-dev \
+        curl \
+        gnupg2 \
+        build-essential \
+        git \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
-# 3️⃣ Install Node (LTS) – needed for the React build
+# 3️⃣ Install Node (LTS) – required for React build
 # -------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
@@ -26,7 +28,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
 WORKDIR /app
 
 # -------------------------------------------------
-# 5️⃣ Python dependencies
+# 5️⃣ Python deps
 # -------------------------------------------------
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -41,7 +43,7 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build       
+RUN npm run build            # creates ./build with static assets
 
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
@@ -49,12 +51,11 @@ RUN npm run build
 WORKDIR /app
 
 # -------------------------------------------------
-# 9️⃣ Expose a placeholder port (Render rewrites with $PORT)
+# 9️⃣ Expose a placeholder port (Render rewrites it)
 # -------------------------------------------------
-EXPOSE 8080   
+EXPOSE 8080   # any non‑privileged number works
 
 # -------------------------------------------------
-# 🔟 Runtime – start the FastAPI app with uvicorn
+# 🔟 Runtime – start FastAPI with uvicorn on $PORT
 # -------------------------------------------------
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
-
