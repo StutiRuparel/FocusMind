@@ -6,14 +6,18 @@ FROM python:3.11-slim
 # -------------------------------------------------
 # 2️⃣ System dependencies – only what OpenCV needs
 # -------------------------------------------------
+#   curl, gnupg, build-essential, git – general utilities
+#   libgl1                     – runtime OpenGL library for opencv‑python
+#   libglib2.0-0               – GLib runtime (required by many wheels)
+#   ca-certificates            – trusted root certificates for HTTPS (curl / node installer)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         gnupg \
         build-essential \
         git \
-        libgl1 \            # runtime OpenGL library for opencv‑python
+        libgl1 \
         libglib2.0-0 \
-        ca-certificates \   # needed for HTTPS (curl / node installer)
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
@@ -44,7 +48,8 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build           
+RUN npm run build    # creates ./build with static assets
+
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
 # -------------------------------------------------
@@ -59,7 +64,7 @@ RUN chmod +x /usr/local/bin/start.sh
 # -------------------------------------------------
 # 🔟 Expose a placeholder port (Render will rewrite $PORT)
 # -------------------------------------------------
-EXPOSE 8080   
+EXPOSE 8080   # any non‑privileged number; Render will replace it with $PORT
 
 # -------------------------------------------------
 # 🔟 Runtime – use the script to launch uvicorn
