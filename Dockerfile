@@ -1,26 +1,39 @@
 # -------------------------------------------------
-# 1️⃣ Base image – Python 3.11 (slim)
+# 1️⃣ Base image – Python 3.11 (slim, Debian bookworm)
 # -------------------------------------------------
 FROM python:3.11-slim
 
 # -------------------------------------------------
-# 2️⃣ System deps (OpenCV, curl, gnupg, node, etc.)
+# 2️⃣ System dependencies – only what OpenCV needs
 # -------------------------------------------------
+#   curl, gnupg, build-essential, git – general utilities
+#   libgl1                     – runtime OpenGL library for opencv‑python
+#   libglib2.0-0               – GLib runtime (required by many wheels)
+#   ca-certificates            – trusted root certificates for HTTPS (curl / node installer)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl gnupg build-essential git libgl1 libglib2.0-0 ca-certificates \
+        curl \
+        gnupg \
+        build-essential \
+        git \
+        libgl1 \
+        libglib2.0-0 \
+        ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
-# 3️⃣ Install Node (LTS) – needed for building the React app
+# 3️⃣ Install Node (LTS) – required for the React build
 # -------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest
+    && npm install -g npm@latest   
 
 # -------------------------------------------------
 # 4️⃣ Working directory
 # -------------------------------------------------
 WORKDIR /app
+
+# ---- make sure the empty audio folder exists for FastAPI ----
+RUN mkdir -p audio_files
 
 # -------------------------------------------------
 # 5️⃣ Python dependencies
@@ -29,7 +42,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -------------------------------------------------
-# 6️⃣ Copy source code (including start.sh if you use it)
+# 6️⃣ Copy the whole source tree (including start.sh)
 # -------------------------------------------------
 COPY . .
 
@@ -37,7 +50,8 @@ COPY . .
 # 7️⃣ Build the React front‑end (production)
 # -------------------------------------------------
 WORKDIR /app/frontend
-RUN npm install && npm run build  
+RUN npm install
+RUN npm run build    
 
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
@@ -45,16 +59,19 @@ RUN npm install && npm run build
 WORKDIR /app
 
 # -------------------------------------------------
-# 9️⃣ Ensure the audio directory exists (optional)
+# 9️⃣ Make the startup script executable
 # -------------------------------------------------
-RUN mkdir -p audio_files
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
 
 # -------------------------------------------------
-# 🔟 Expose a placeholder port (Render rewrites it with $PORT)
+# 🔟 Expose a placeholder port (Render will rewrite $PORT)
 # -------------------------------------------------
-EXPOSE 8080
+EXPOSE 8080  
 
 # -------------------------------------------------
-# 🟢 Run uvicorn in the foreground – this is the only CMD
+# 🔟 Runtime – use the script to launch uvicorn
 # -------------------------------------------------
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["/usr/local/bin/start.sh"]
+
+
