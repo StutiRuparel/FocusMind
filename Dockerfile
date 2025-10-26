@@ -1,10 +1,9 @@
 # -------------------------------------------------
-#  Base image – pick the exact Python version you need
-#  (change 3.11‑slim to 3.10‑slim, 3.12‑slim, etc.)
+#  Base image – change the version if you need another
 # -------------------------------------------------
-FROM python:3.11-slim
+FROM python:3.11-slim   # replace with 3.10‑slim, 3.12‑slim, etc.
 
-# ---- Install OS utilities needed for Node and builds ----
+# ---- System utilities needed for Node and builds ----
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         gnupg \
@@ -12,49 +11,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
     && rm -rf /var/lib/apt/lists/*
 
-# ---- Install Node (LTS) from the official repo ----------
+# ---- Install Node (LTS) ---------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest   # optional – newest npm
+    && npm install -g npm@latest
 
-# -------------------------------------------------
-#  Working directory inside the container
-# -------------------------------------------------
+# ---- Working directory ----------------------------
 WORKDIR /app
 
-# -------------------------------------------------
-#  1️⃣ Install Python dependencies (build step)
-# -------------------------------------------------
+# ---- Install Python dependencies -------------------
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# -------------------------------------------------
-#  2️⃣ Copy the whole source tree
-# -------------------------------------------------
+# ---- Copy the whole source tree --------------------
 COPY . .
 
-# -------------------------------------------------
-#  3️⃣ Install the frontend (Node) dependencies
-# -------------------------------------------------
+# ---- Install frontend (Node) dependencies ----------
 WORKDIR /app/frontend
 RUN npm install
 
-# -------------------------------------------------
-#  Return to project root for the runtime command
-# -------------------------------------------------
+# ---- Return to project root -----------------------
 WORKDIR /app
 
-# -------------------------------------------------
-#  Expose a port – Render injects $PORT at runtime
-# -------------------------------------------------
-EXPOSE 10000   # any number; Render rewrites it to $PORT
+# ---- Expose a port (Render will inject $PORT) ----
+# Choose any numeric placeholder; Render overwrites it.
+EXPOSE 8080
 
-# -------------------------------------------------
-#  4️⃣ Runtime – launch backend and frontend together
-# -------------------------------------------------
-# The `sh -c` string runs both commands in background (`&`)
-# and then `wait`s so the container stays alive as long as either
-# process runs.
+# ---- Runtime command – launch backend & frontend ----
 CMD ["sh", "-c", "\
     python main.py & \
     cd frontend && npm start & \
