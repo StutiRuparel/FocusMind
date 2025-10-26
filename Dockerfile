@@ -1,67 +1,59 @@
 # -------------------------------------------------
-# Base image – pick the Python version you need.
-# Change 3.11‑slim to 3.10‑slim, 3.12‑slim, etc. if required.
+# 1️⃣ Base image – Python 3.11 (change if you need another)
 # -------------------------------------------------
 FROM python:3.11-slim
 
 # -------------------------------------------------
-# Install OS utilities needed for Node and builds
+# 2️⃣ System dependencies (OpenCV GL libs + Node)
 # -------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl \
-        gnupg \
-        build-essential \
-        git \
+        curl gnupg build-essential git \
+        libgl1-mesa-glx libglib2.0-0 \
+        # optional but useful for other CV wheels
+        libglib2.0-dev libsm6 libxext6 libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------------
-# Install Node (LTS) from the official repository
+# 3️⃣ Install Node (LTS) – needed for the React build
 # -------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
     && apt-get install -y nodejs \
-    && npm install -g npm@latest   # optional – newest npm
+    && npm install -g npm@latest
 
 # -------------------------------------------------
-# Set the working directory inside the container
+# 4️⃣ Working directory
 # -------------------------------------------------
 WORKDIR /app
 
 # -------------------------------------------------
-# Install Python dependencies (build step)
+# 5️⃣ Python dependencies
 # -------------------------------------------------
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -------------------------------------------------
-# Copy the whole source tree into the image
+# 6️⃣ Copy source code
 # -------------------------------------------------
 COPY . .
 
 # -------------------------------------------------
-# Install frontend (Node) dependencies
+# 7️⃣ Build the React front‑end (production)
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
+RUN npm run build        # creates ./build
 
 # -------------------------------------------------
-# Return to the project root for the runtime command
+# 8️⃣ Return to project root for runtime
 # -------------------------------------------------
 WORKDIR /app
 
 # -------------------------------------------------
-# Expose a placeholder port.
-# Render will replace this with the value of $PORT at runtime.
+# 9️⃣ Expose a placeholder port (Render rewrites with $PORT)
 # -------------------------------------------------
-EXPOSE 8080
+EXPOSE 8080   # any non‑privileged number works
 
 # -------------------------------------------------
-# Runtime: launch backend and frontend together
+# 🔟 Runtime – start the FastAPI app with uvicorn
 # -------------------------------------------------
-# The sh -c string runs both commands in the background (&)
-# and then `wait`s so the container stays alive while either runs.
-CMD ["sh", "-c", "\
-    python main.py & \
-    cd frontend && npm start & \
-    wait\
-"]
-
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
