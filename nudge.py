@@ -241,7 +241,8 @@ Be direct and motivating but adjust intensity based on how low the attention sco
             subprocess.run(["notify-send", "FocusMind Nudge 💪", message])
         elif sys.platform == "win32":  # Windows
             # For Windows, we'll use a simple print for now (can be enhanced with plyer library)
-            print(f"NOTIFICATION: {message}")
+            # print(f"NOTIFICATION: {message}")
+            pass
         
         # Return as JSON for easy parsing
         result = {

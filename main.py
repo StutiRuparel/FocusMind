@@ -255,7 +255,7 @@ async def get_notification_nudge():
             text=True, 
             cwd=os.path.dirname(os.path.abspath(__file__))
         )
-        
+
         if result.returncode == 0:
             # Parse JSON output from nudge.py
             output_data = json.loads(result.stdout.strip())
