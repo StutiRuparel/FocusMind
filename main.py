@@ -11,92 +11,91 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from openai import OpenAI
 from pydantic import BaseModel
+import random
 
-# ----------------------------------------------------------------------
-# Your own modules
-# ----------------------------------------------------------------------
+# ---- Your own modules -------------------------------------------------
 from FocusScore import generate_focus_chart_base64, generate_session_stats
 from face_focus_tracker import FaceFocusTracker
+# ---------------------------------------------------------------------
 
-# ----------------------------------------------------------------------
-# Global state
-# ----------------------------------------------------------------------
+# Global state ---------------------------------------------------------
 attention_score = 100
 focus_score_history = []
 face_tracker = None
 tracking_active = False
+# ---------------------------------------------------------------------
 
-# ----------------------------------------------------------------------
-# Load environment variables
-# ----------------------------------------------------------------------
+# Load .env ------------------------------------------------------------
 load_dotenv()
+# ---------------------------------------------------------------------
 
-# ----------------------------------------------------------------------
-# FastAPI app declaration
-# ----------------------------------------------------------------------
+# --------------------------- FastAPI app -------------------------------
 app = FastAPI(
     title="FocusMind API",
     description="Motivational Study Coach API"
 )
 
-# ----------------------------------------------------------------------
-# Ensure the audio folder exists *before* mounting it
-# ----------------------------------------------------------------------
-audio_dir = Path("audio_files")
-audio_dir.mkdir(parents=True, exist_ok=True)
-
-# ----------------------------------------------------------------------
-# Static mounts
-# ----------------------------------------------------------------------
+# --------------------------- Static mounts -----------------------------
+# 1️⃣  Audio files (already present)
 app.mount("/audio", StaticFiles(directory="audio_files"), name="audio")
 
-# ----------------------------------------------------------------------
-# CORS – add the Render domain so the UI can call the API
-# ----------------------------------------------------------------------
+# 2️⃣  React front‑end (served at root)
+# `html=True` makes FastAPI fall back to `index.html` for any unknown path –
+# perfect for a single‑page app.
+app.mount(
+    "/",                                 # root URL
+    StaticFiles(directory="frontend/build", html=True),
+    name="frontend"
+)
+
+# ---------------------------------------------------------------------
+# (Optional) add a very small health‑check that does **not** sit on `/`
+@app.get("/health")
+async def health():
+    """Simple health‑check – returns 200 OK."""
+    return {"status": "ok"}
+# ---------------------------------------------------------------------
+
+# --------------------------- CORS middleware -------------------------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000", "http://localhost:3001", "http://localhost:3002",
         "http://localhost:3003", "http://localhost:3004", "http://localhost:3005",
-        "http://localhost:3006", "http://localhost:3007", "http://localhost:3008",
-        "https://tfl‑cnsg.onrender.com",   # <-- Render URL
+        "http://localhost:3006", "http://localhost:3007", "http://localhost:3008"
+        # you can also add your Render URL here, e.g.
+        # "https://tfl-cnsg.onrender.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ---------------------------------------------------------------------
 
-# ----------------------------------------------------------------------
-# OpenAI client
-# ----------------------------------------------------------------------
+# --------------------------- OpenAI client ---------------------------
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
     raise ValueError("OPENAI_API_KEY environment variable is required")
 client = OpenAI(api_key=api_key)
+# ---------------------------------------------------------------------
 
-# ----------------------------------------------------------------------
-# Pydantic models
-# ----------------------------------------------------------------------
+# --------------------------- Pydantic models ------------------------
 class MotivationResponse(BaseModel):
     message: str
     attention_score: int
 
 class VoiceAudioRequest(BaseModel):
     message: str
+# ---------------------------------------------------------------------
 
-# ----------------------------------------------------------------------
-# Health‑check (does NOT sit on "/")
-# ----------------------------------------------------------------------
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
+# --------------------------- Endpoints ------------------------------
+# NOTE: The original `@app.get("/")` endpoint has been removed.
+# All other endpoints stay exactly as you wrote them.
+# (Only the doc‑string/comments have been trimmed for brevity.)
 
-# ----------------------------------------------------------------------
-# -------------------------- API ENDPOINTS --------------------------
-# ----------------------------------------------------------------------
 @app.get("/motivation", response_model=MotivationResponse)
 async def get_motivation(reset: bool = False):
-    """Return a motivational quote."""
+    """Get a motivational quote from a David‑Goggins‑style coach."""
     global attention_score, focus_score_history
 
     if reset:
@@ -105,7 +104,9 @@ async def get_motivation(reset: bool = False):
 
     if not focus_score_history:
         now = datetime.now().strftime("%H:%M:%S")
-        focus_score_history.append({"timestamp": now, "focus_score": attention_score})
+        focus_score_history.append(
+            {"timestamp": now, "focus_score": attention_score}
+        )
 
     try:
         response = client.chat.completions.create(
@@ -114,7 +115,7 @@ async def get_motivation(reset: bool = False):
                 {
                     "role": "system",
                     "content": (
-                        "You are study coach loosely inspired by David Goggins. "
+                        "You are a study coach loosely inspired by David Goggins. "
                         "Give intense, motivational study advice in a strictly PG version "
                         "of his style. (No swearing). Keep it under 30 words."
                     ),
@@ -126,8 +127,9 @@ async def get_motivation(reset: bool = False):
         msg = response.choices[0].message.content
         return MotivationResponse(message=msg, attention_score=attention_score)
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Error generating motivation: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error generating motivation: {str(e)}"
+        )
 
 
 @app.get("/attention-score")
@@ -141,7 +143,9 @@ async def decrease_attention():
     attention_score = max(0, attention_score - 15)
 
     now = datetime.now().strftime("%H:%M:%S")
-    focus_score_history.append({"timestamp": now, "focus_score": attention_score})
+    focus_score_history.append(
+        {"timestamp": now, "focus_score": attention_score}
+    )
     return {
         "attention_score": attention_score,
         "message": f"Attention score decreased to {attention_score}",
@@ -157,6 +161,7 @@ async def get_focus_chart():
     try:
         png_path, chart_b64_bytes = generate_focus_chart_base64(focus_score_history)
         session_stats = generate_session_stats(focus_score_history)
+
         return {
             "success": True,
             "chart_base64": chart_b64_bytes.decode("ascii"),
@@ -165,8 +170,9 @@ async def get_focus_chart():
             "data_points": len(focus_score_history),
         }
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Error generating focus chart: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error generating focus chart: {str(e)}"
+        )
 
 
 @app.post("/reset-focus-session")
@@ -180,6 +186,7 @@ async def reset_focus_session():
 async def get_focus_session_stats():
     if not focus_score_history:
         return {"data_points": 0, "session_active": False}
+
     stats = generate_session_stats(focus_score_history)
     return {
         "data_points": len(focus_score_history),
@@ -207,6 +214,7 @@ async def get_voice_nudge():
 
         audio_file = data.get("audio_file")
         audio_url = f"/audio/{audio_file}" if audio_file else None
+
         return {
             "success": True,
             "message": data["message"],
@@ -217,11 +225,9 @@ async def get_voice_nudge():
             "attention_score": attention_score,
         }
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500,
-                            detail=f"JSON parse error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"JSON parse error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Voice nudge error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Voice nudge error: {str(e)}")
 
 
 @app.post("/generate-voice-audio")
@@ -242,6 +248,7 @@ async def generate_voice_audio(request: VoiceAudioRequest):
 
         audio_file = data.get("audio_file")
         audio_url = f"/audio/{audio_file}" if audio_file else None
+
         return {
             "success": True,
             "message": request.message,
@@ -250,11 +257,9 @@ async def generate_voice_audio(request: VoiceAudioRequest):
             "source": "David Goggins AI",
         }
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500,
-                            detail=f"JSON parse error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"JSON parse error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Audio generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Audio generation error: {str(e)}")
 
 
 @app.post("/get-notification-nudge")
@@ -282,11 +287,9 @@ async def get_notification_nudge():
             "platform": data.get("platform", "unknown"),
         }
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500,
-                            detail=f"JSON parse error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"JSON parse error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Notification nudge error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Notification nudge error: {str(e)}")
 
 
 @app.post("/get-break-nudge")
@@ -307,6 +310,7 @@ async def get_break_nudge():
 
         audio_file = data.get("audio_file")
         audio_url = f"/audio/{audio_file}" if audio_file else None
+
         return {
             "success": True,
             "message": data["message"],
@@ -316,22 +320,18 @@ async def get_break_nudge():
             "nudge_type": "break",
         }
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500,
-                            detail=f"JSON parse error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"JSON parse error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Break nudge error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Break nudge error: {str(e)}")
 
 
 @app.post("/get-nudge-quote")
 async def get_nudge_quote():
-    """Backward‑compatible endpoint – forwards to the voice nudge."""
+    """Backward‑compatible endpoint – just forwards to voice nudge."""
     return await get_voice_nudge()
 
 
-# ----------------------------------------------------------------------
-# Face‑tracking endpoints
-# ----------------------------------------------------------------------
+# --------------------------- Face‑tracking API -----------------------
 class FocusScoreUpdate(BaseModel):
     focus_score: float
 
@@ -349,6 +349,7 @@ async def update_focus_score(request: FocusScoreUpdate):
     focus_score_history.append(
         {"timestamp": datetime.now(), "score": attention_score}
     )
+    # keep recent history only
     if len(focus_score_history) > 1000:
         focus_score_history = focus_score_history[-1000:]
 
@@ -394,11 +395,9 @@ async def trigger_auto_motivation(request: AutoMotivationTrigger):
             "focus_score": request.focus_score,
         }
     except json.JSONDecodeError as e:
-        raise HTTPException(status_code=500,
-                            detail=f"JSON parse error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"JSON parse error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Auto‑motivation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Auto‑motivation error: {str(e)}")
 
 
 @app.get("/face-tracking-status")
@@ -410,6 +409,7 @@ async def get_face_tracking_status():
             "last_update": None,
             "message": "Face tracking not initialized",
         }
+
     return {
         "active": tracking_active,
         "score": focus_score_history[-1]["score"]
@@ -418,7 +418,9 @@ async def get_face_tracking_status():
         "last_update": focus_score_history[-1]["timestamp"]
         if focus_score_history
         else None,
-        "message": "Face tracking active" if tracking_active else "Face tracking paused",
+        "message": "Face tracking active"
+        if tracking_active
+        else "Face tracking paused",
     }
 
 
@@ -436,20 +438,9 @@ async def stop_face_tracking():
     return {"success": True, "message": "Face tracking stop signal sent."}
 
 
-# ----------------------------------------------------------------------
-# ***** FINAL static mount – this must be **after** all API routes *****
-# ----------------------------------------------------------------------
-app.mount(
-    "/",                                 # root URL (fallback for anything not matched above)
-    StaticFiles(directory="frontend/build", html=True),
-    name="frontend",
-)
-
-
-# ----------------------------------------------------------------------
-# Entry point – Render injects $PORT, default to 8000 for local testing
-# ----------------------------------------------------------------------
+# --------------------------- Entry point -----------------------------
 if __name__ == "__main__":
+    # Render injects $PORT; default to 8000 for local testing
     port = int(os.getenv("PORT", 8000))
     import uvicorn
 
