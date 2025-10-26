@@ -43,7 +43,7 @@ COPY . .
 # -------------------------------------------------
 WORKDIR /app/frontend
 RUN npm install
-RUN npm run build            # creates ./build with static assets
+RUN npm run build            
 
 # -------------------------------------------------
 # 8️⃣ Return to project root for runtime
@@ -53,9 +53,9 @@ WORKDIR /app
 # -------------------------------------------------
 # 9️⃣ Expose a placeholder port (Render rewrites it)
 # -------------------------------------------------
-EXPOSE 8080   # any non‑privileged number works
-
+EXPOSE 8080
 # -------------------------------------------------
 # 🔟 Runtime – start FastAPI with uvicorn on $PORT
 # -------------------------------------------------
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+
