@@ -443,7 +443,7 @@ async def stop_face_tracking():
     }
 
 if __name__ == "__main__":
-    import uvicorn
-    # Use $PORT if it exists, otherwise fall back to 8000 for local dev
+    import uvicorn, os
+    # Render injects $PORT; default to 8000 for local runs
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
