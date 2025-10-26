@@ -108,8 +108,6 @@ Open your browser and navigate to:
 
 ## 🎮 How to Use
 
-## 🎮 How to Use
-
 ### 🤖 AI-Powered Workflow (Recommended)
 
 1. **Start Session**: Open FocusMind and see your initial motivational quote
